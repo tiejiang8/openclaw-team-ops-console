@@ -1,6 +1,6 @@
 {
   "name": "openclaw-team-ops-console",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.0",
   "private": true,
   "description": "OpenClaw Team Ops Console - Read-only governance and visibility for OpenClaw runtimes",
   "packageManager": "pnpm@10.6.4",

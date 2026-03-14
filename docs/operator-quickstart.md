@@ -1,6 +1,6 @@
 # Operator Quickstart
 
-This quickstart is for internal evaluators who want to run the governance preview quickly and verify the current read-only scope.
+This quickstart is for internal evaluators who want to run the current v0.2 alpha governance preview quickly and verify the read-only scope.
 
 ## What you are starting
 
@@ -52,6 +52,7 @@ Use this path when you want the container stack to read a real local OpenClaw ru
 
 ```bash
 cp .env.filesystem.example .env.filesystem
+# update the placeholder host paths in .env.filesystem before starting
 docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
 ```
 

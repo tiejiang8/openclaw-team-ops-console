@@ -1,6 +1,6 @@
 # Local Deployment
 
-This document covers supported local startup paths for the current governance preview.
+This document covers supported local startup paths for the current v0.2 alpha governance preview.
 
 ## Supported modes
 
@@ -132,6 +132,7 @@ Prepare the env file:
 
 ```bash
 cp .env.filesystem.example .env.filesystem
+# update the placeholder host paths in .env.filesystem before starting
 ```
 
 Start:

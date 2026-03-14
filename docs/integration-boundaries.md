@@ -4,7 +4,7 @@
 
 OpenClaw Team Ops Console is an **external sidecar product**. It integrates with OpenClaw as an external system and does not require or assume modifications in OpenClaw core.
 
-## Hard Rules for v0.1
+## Hard Rules for v0.2 Alpha
 
 - Do not modify OpenClaw source code.
 - Do not patch/fork/vendor OpenClaw core.
@@ -21,7 +21,7 @@ OpenClaw Team Ops Console is an **external sidecar product**. It integrates with
 - overlay-web consumes only overlay-api contracts
 - degraded or partial external reads must surface via collection metadata and warnings, not hidden assumptions
 
-## Non-goals for v0.1
+## Non-goals for v0.2 Alpha
 
 - agent creation/deletion
 - session termination
@@ -51,7 +51,7 @@ Confirmed examples now include:
 - `openclaw doctor` is not a valid adapter source because it can repair or mutate state.
 - Any gateway/UI/API surface that is not externally documented or clearly stable should remain a future option only.
 
-## Security and Compliance Posture (v0.1)
+## Security and Compliance Posture (v0.2 alpha)
 
 - read-only by design
 - no credential mutation endpoints

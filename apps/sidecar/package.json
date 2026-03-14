@@ -1,6 +1,6 @@
 {
   "name": "@openclaw-team-ops/sidecar",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.0",
   "private": true,
   "type": "module",
   "description": "OpenClaw Team Ops Sidecar - read-only source collection",

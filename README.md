@@ -4,7 +4,7 @@
 
 ## 中文
 
-OpenClaw Team Ops Console 当前是一套面向内部评审的 **v0.2 governance preview**：
+OpenClaw Team Ops Console 当前是一套面向内部评审的 **v0.2 alpha 治理预览版**：
 
 - 独立运行，不依赖修改 OpenClaw core
 - 严格只读，不提供写回、控制、终止、编辑、创建等能力
@@ -241,6 +241,7 @@ filesystem 只读 compose：
 
 ```bash
 cp .env.filesystem.example .env.filesystem
+# 先把 .env.filesystem 里的宿主机占位路径改成你的真实 OpenClaw 路径
 docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
 ```
 
@@ -433,7 +434,7 @@ docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.y
 
 ## English
 
-OpenClaw Team Ops Console currently ships as a **v0.2 governance preview** for internal evaluation:
+OpenClaw Team Ops Console currently ships as a **v0.2 alpha governance preview** for internal evaluation:
 
 - standalone, with no OpenClaw core changes required
 - strictly read-only
@@ -641,6 +642,7 @@ Filesystem read-only compose:
 
 ```bash
 cp .env.filesystem.example .env.filesystem
+# update the placeholder host paths in .env.filesystem before starting
 docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
 ```
 
@@ -720,7 +722,7 @@ On Linux/WSL, `corepack pnpm test:e2e` automatically prepares a small local libr
 
 ### Known limitations
 
-- internal alpha / preview only
+- v0.2 alpha / governance preview only
 - filesystem is the only real adapter today
 - only one minimal browser-level E2E is in place today
 - browser-level screenshots are still pending

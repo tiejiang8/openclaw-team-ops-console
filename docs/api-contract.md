@@ -1,4 +1,4 @@
-# API Contract (v0.2 governance preview)
+# API Contract (v0.2 alpha)
 
 Primary contracts are typed in `packages/shared/src/contracts.ts` and implemented by `apps/overlay-api`.
 

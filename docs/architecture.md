@@ -4,7 +4,7 @@
 
 - **Name:** OpenClaw Team Ops Console
 - **Positioning:** Read-only governance and visibility for OpenClaw runtimes
-- **Current status:** v0.2 governance preview for internal evaluation
+- **Current status:** v0.2 alpha governance preview for internal evaluation
 
 ## Design Objective
 

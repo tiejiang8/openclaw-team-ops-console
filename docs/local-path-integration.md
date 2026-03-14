@@ -199,6 +199,7 @@ The repository also provides a filesystem-backed compose path for real OpenClaw 
 
 ```bash
 cp .env.filesystem.example .env.filesystem
+# update the placeholder host paths in .env.filesystem before starting
 docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
 ```
 
