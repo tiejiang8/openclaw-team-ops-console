@@ -58,6 +58,8 @@ Default URLs:
 - overlay-web uses same-origin `/api` and `/health` routing by default
 - Vite proxies those requests to overlay-api during local development
 - sidecar remains read-only and prints its adapter state on startup
+- non-Docker process mode now keeps `4300` and `4310` on `127.0.0.1` by default
+- keep `VITE_OVERLAY_API_URL` empty for remote process-mode access so browsers do not call `4300` directly
 
 ## Optional local OpenClaw path mode
 

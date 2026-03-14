@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: apps/sidecar/Dockerfile
     environment:
+      SIDECAR_HOST: 0.0.0.0
       SIDECAR_PORT: 4310
       SIDECAR_MOCK_SCENARIO: ${SIDECAR_MOCK_SCENARIO:-baseline}
     ports:
@@ -20,6 +21,7 @@ services:
       context: .
       dockerfile: apps/overlay-api/Dockerfile
     environment:
+      OVERLAY_API_HOST: 0.0.0.0
       OVERLAY_API_PORT: 4300
       SIDECAR_BASE_URL: http://sidecar:4310
       SIDECAR_TIMEOUT_MS: ${SIDECAR_TIMEOUT_MS:-5000}

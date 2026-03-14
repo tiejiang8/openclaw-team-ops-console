@@ -230,6 +230,13 @@ HOST_OVERLAY_WEB_PORT=9527
   - 通过只读 bind mount 挂载宿主机 OpenClaw state / workspace
   - sidecar 优先使用官方 env：`OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` / `OPENCLAW_PROFILE`
   - `OPENCLAW_WORKSPACE_GLOB` 仅作为可选 override
+  - 容器内会显式绑定 `0.0.0.0`，保证 sidecar 和 overlay-api 可在容器网络中互通
+
+非 Docker 部署建议：
+
+- `9527` 可对外提供访问
+- `4300` 和 `4310` 默认仅绑定 `127.0.0.1`
+- `VITE_OVERLAY_API_URL` 保持为空，优先走同源 `/api` 代理，避免浏览器直接访问 `4300`
 
 mock-first demo compose：
 
@@ -292,6 +299,7 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 ### 常用环境变量
 
 #### sidecar
+- `SIDECAR_HOST`
 - `SIDECAR_PORT`
 - `SIDECAR_MOCK_SCENARIO`
 - `SIDECAR_TARGET_ID`
@@ -311,6 +319,7 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 - `OPENCLAW_LOG_GLOB`（当前预留，未接线）
 
 #### overlay-api
+- `OVERLAY_API_HOST`
 - `OVERLAY_API_PORT`
 - `SIDECAR_BASE_URL`
 - `SIDECAR_TIMEOUT_MS`
@@ -322,6 +331,14 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 - `HOST_SIDECAR_PORT`
 - `HOST_OVERLAY_API_PORT`
 - `HOST_OVERLAY_WEB_PORT`
+
+推荐的非 Docker 远程部署方式：
+
+- `SIDECAR_HOST=127.0.0.1`
+- `OVERLAY_API_HOST=127.0.0.1`
+- `SIDECAR_BASE_URL=http://127.0.0.1:4310`
+- `OVERLAY_API_PROXY_TARGET=http://127.0.0.1:4300`
+- `VITE_OVERLAY_API_URL=` 保持为空
 
 ### 当前主要页面
 

@@ -2,11 +2,12 @@ import { createSidecarAdapterFromEnv } from "./adapters/create-adapter.js";
 import { createSidecarApp } from "./app.js";
 
 const port = Number(process.env.SIDECAR_PORT ?? 4310);
+const host = process.env.SIDECAR_HOST ?? "127.0.0.1";
 const adapter = createSidecarAdapterFromEnv(process.env);
 const app = createSidecarApp(adapter);
 
-app.listen(port, () => {
-  console.log(`[sidecar] listening on http://localhost:${port}`);
+app.listen(port, host, () => {
+  console.log(`[sidecar] listening on http://${host}:${port}`);
   if (process.env.SIDECAR_TARGETS_FILE) {
     console.log(`[sidecar] targetsFile=${process.env.SIDECAR_TARGETS_FILE}`);
   } else if (process.env.SIDECAR_TARGET_ID || process.env.SIDECAR_TARGET_NAME) {

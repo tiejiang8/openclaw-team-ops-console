@@ -34,6 +34,11 @@ corepack pnpm dev
 
 - `http://localhost:5173`
 
+Notes:
+
+- in non-Docker process mode, `4300` and `4310` stay on `127.0.0.1` by default
+- keep `VITE_OVERLAY_API_URL` empty so the browser uses the web server's same-origin `/api` proxy instead of calling `4300` directly
+
 ## Fastest container path
 
 Mock-first demo compose:
