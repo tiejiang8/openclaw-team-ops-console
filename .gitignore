@@ -5,6 +5,7 @@ coverage
 .cache
 *.log
 .env
+.env.filesystem
 .env.local
 .env.*.local
 .DS_Store

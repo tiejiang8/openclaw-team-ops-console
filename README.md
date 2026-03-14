@@ -218,6 +218,38 @@ OVERLAY_WEB_PORT=9527
 HOST_OVERLAY_WEB_PORT=9527
 ```
 
+### Docker Compose 启动
+
+当前仓库提供两套 compose：
+
+- `docker-compose.yml`
+  - 继续作为 **mock-first demo compose**
+  - 不挂载真实 OpenClaw 运行目录
+- `docker-compose.filesystem.yml`
+  - 用于 **真实 OpenClaw 只读接线 compose**
+  - 通过只读 bind mount 挂载宿主机 OpenClaw state / workspace
+  - sidecar 优先使用官方 env：`OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` / `OPENCLAW_PROFILE`
+  - `OPENCLAW_WORKSPACE_GLOB` 仅作为可选 override
+
+mock-first demo compose：
+
+```bash
+docker compose up --build
+```
+
+filesystem 只读 compose：
+
+```bash
+cp .env.filesystem.example .env.filesystem
+docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+```
+
+停止：
+
+```bash
+docker compose -f docker-compose.filesystem.yml down --remove-orphans
+```
+
 ### 默认模式与切换规则
 
 #### 1. 默认 mock 模式
@@ -361,6 +393,12 @@ corepack pnpm playwright:install
 corepack pnpm test:e2e
 corepack pnpm build
 corepack pnpm check
+```
+
+filesystem compose 配置校验：
+
+```bash
+docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.yml config
 ```
 
 ### 文档索引
@@ -580,6 +618,38 @@ Default local URLs:
 - Overlay API: `http://localhost:4300`
 - Sidecar: `http://localhost:4310`
 
+### Docker Compose startup
+
+The repository now ships with two compose files:
+
+- `docker-compose.yml`
+  - remains the **mock-first demo compose**
+  - does not mount a real OpenClaw runtime
+- `docker-compose.filesystem.yml`
+  - is the **real OpenClaw read-only integration compose**
+  - mounts host OpenClaw state / workspace paths as read-only bind mounts
+  - makes sidecar prefer official envs: `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, and `OPENCLAW_PROFILE`
+  - keeps `OPENCLAW_WORKSPACE_GLOB` as an optional override only
+
+Mock-first demo compose:
+
+```bash
+docker compose up --build
+```
+
+Filesystem read-only compose:
+
+```bash
+cp .env.filesystem.example .env.filesystem
+docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+```
+
+Stop:
+
+```bash
+docker compose -f docker-compose.filesystem.yml down --remove-orphans
+```
+
 ### Mode selection
 
 - no local runtime paths configured -> `mock`
@@ -612,6 +682,12 @@ corepack pnpm dev
 corepack pnpm playwright:install
 corepack pnpm test:e2e
 corepack pnpm check
+```
+
+Filesystem compose config check:
+
+```bash
+docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.yml config
 ```
 
 ### Browser E2E

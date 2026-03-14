@@ -192,3 +192,20 @@ OPENCLAW_CONFIG_PATH=~/.openclaw-dev/openclaw.json \
 OPENCLAW_WORKSPACE_GLOB='~/.openclaw/workspace*' \
 corepack pnpm dev
 ```
+
+## Containerized Read-only Path
+
+The repository also provides a filesystem-backed compose path for real OpenClaw read-only evaluation:
+
+```bash
+cp .env.filesystem.example .env.filesystem
+docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+```
+
+Container notes:
+
+- the sidecar container uses `OPENCLAW_STATE_DIR=/openclaw-state`
+- `OPENCLAW_CONFIG_PATH` defaults to `/openclaw-state/openclaw.json`
+- `OPENCLAW_PROFILE` stays optional
+- `OPENCLAW_WORKSPACE_GLOB` is optional and defaults to `/openclaw-state/workspace*`
+- host state and workspace paths are bind-mounted read-only

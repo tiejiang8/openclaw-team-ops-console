@@ -16,6 +16,7 @@
 - governance endpoints for targets, evidence, findings, recommendations, and risks summary
 - inventory-first and governance-first UI
 - containerized local startup path
+- mock-first demo compose plus filesystem-backed read-only compose
 - CI quality gates for install, read-only guard, typecheck, test, and build
 
 ## Scope explicitly excluded
@@ -32,6 +33,7 @@
 
 - [ ] repository starts locally with `corepack pnpm dev`
 - [ ] repository starts with `docker compose up --build`
+- [ ] filesystem compose renders with `docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.yml config`
 - [ ] default startup uses mock mode without extra setup
 - [ ] `Overview`, `Targets`, `Risks`, `Findings`, and `Evidence` load successfully
 - [ ] inventory pages still load successfully

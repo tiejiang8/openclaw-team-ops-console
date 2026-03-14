@@ -36,6 +36,8 @@ corepack pnpm dev
 
 ## Fastest container path
 
+Mock-first demo compose:
+
 ```bash
 docker compose up --build
 ```
@@ -43,6 +45,25 @@ docker compose up --build
 Then open:
 
 - `http://localhost:5173`
+
+## Filesystem container path
+
+Use this path when you want the container stack to read a real local OpenClaw runtime in read-only mode:
+
+```bash
+cp .env.filesystem.example .env.filesystem
+docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+```
+
+Then open:
+
+- `http://localhost:5173`
+
+Notes:
+
+- sidecar prefers `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, and `OPENCLAW_PROFILE`
+- `OPENCLAW_WORKSPACE_GLOB` stays optional
+- host state and workspace paths are mounted read-only only
 
 ## Recommended reviewer path
 
@@ -71,6 +92,12 @@ Container logs:
 
 ```bash
 docker compose logs -f
+```
+
+Filesystem container logs:
+
+```bash
+docker compose -f docker-compose.filesystem.yml logs -f
 ```
 
 ## Mock scenario examples

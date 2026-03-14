@@ -14,7 +14,14 @@ Runs the three applications directly from this repository:
 
 ### 2. Container mode
 
-Runs the same architecture with Docker Compose in default mock mode.
+Runs the same architecture with Docker Compose.
+
+There are now two supported compose paths:
+
+- `docker-compose.yml`
+  - mock-first demo compose
+- `docker-compose.filesystem.yml`
+  - real OpenClaw read-only filesystem compose
 
 ## Environment setup
 
@@ -95,7 +102,9 @@ Target registry notes:
 
 ## Container startup
 
-The provided Compose setup remains mock-first by default and does not mount an OpenClaw runtime directory automatically.
+### Mock-first demo compose
+
+The default compose path remains mock-first and does not mount an OpenClaw runtime directory automatically.
 
 Start:
 
@@ -115,6 +124,41 @@ Follow logs:
 docker compose logs -f
 ```
 
+### Filesystem read-only compose
+
+Use the filesystem compose when you want containerized startup against a real local OpenClaw state directory while keeping the whole stack read-only.
+
+Prepare the env file:
+
+```bash
+cp .env.filesystem.example .env.filesystem
+```
+
+Start:
+
+```bash
+docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+```
+
+Stop:
+
+```bash
+docker compose -f docker-compose.filesystem.yml down --remove-orphans
+```
+
+Follow logs:
+
+```bash
+docker compose -f docker-compose.filesystem.yml logs -f
+```
+
+Filesystem compose notes:
+
+- sidecar uses `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, and `OPENCLAW_PROFILE` as the primary container-side OpenClaw envs
+- `OPENCLAW_WORKSPACE_GLOB` is kept as an optional override only
+- host OpenClaw paths are bind-mounted read-only
+- the existing three-service topology and healthcheck structure remain unchanged
+
 ## Healthchecks
 
 Compose includes healthchecks for:
@@ -122,6 +166,12 @@ Compose includes healthchecks for:
 - sidecar: `GET /health`
 - overlay-api: `GET /health`
 - overlay-web: `GET /ready`
+
+Filesystem compose config validation:
+
+```bash
+docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.yml config
+```
 
 ## Quality verification
 
