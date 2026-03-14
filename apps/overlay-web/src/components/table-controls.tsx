@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useI18n } from "../lib/i18n.js";
 import type { SortDirection, TableDensity } from "../lib/table-state.js";
 
 export function SortableHeader({
@@ -33,23 +34,25 @@ export function SortableHeader({
 }
 
 export function TableToolbar({ children, density, setDensity }: { children: ReactNode; density: TableDensity; setDensity: (density: TableDensity) => void }) {
+  const { t } = useI18n();
+
   return (
     <div className="filter-row filter-row-spread">
       <div className="filter-row">{children}</div>
-      <div className="density-toggle" role="group" aria-label="Table density">
+      <div className="density-toggle" role="group" aria-label={t("table.density")}>
         <button
           type="button"
           className={`density-button${density === "comfortable" ? " density-button-active" : ""}`}
           onClick={() => setDensity("comfortable")}
         >
-          Comfortable
+          {t("table.comfortable")}
         </button>
         <button
           type="button"
           className={`density-button${density === "compact" ? " density-button-active" : ""}`}
           onClick={() => setDensity("compact")}
         >
-          Compact
+          {t("table.compact")}
         </button>
       </div>
     </div>
@@ -77,17 +80,17 @@ export function PaginationControls({
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="pagination-row">
       <div className="pagination-meta">
-        <span>
-          Showing {startItemIndex}-{endItemIndex} of {totalItems}
-        </span>
+        <span>{t("table.showing", { start: startItemIndex, end: endItemIndex, total: totalItems })}</span>
       </div>
 
       <div className="pagination-controls">
         <label className="page-size-control">
-          <span>Rows</span>
+          <span>{t("table.rows")}</span>
           <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="filter-select filter-select-inline">
             {allowedPageSizes.map((size) => (
               <option key={size} value={size}>
@@ -98,15 +101,13 @@ export function PaginationControls({
         </label>
 
         <button type="button" className="pagination-button" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-          Prev
+          {t("table.prev")}
         </button>
 
-        <span className="pagination-page">
-          Page {page} / {totalPages}
-        </span>
+        <span className="pagination-page">{t("table.page", { page, totalPages })}</span>
 
         <button type="button" className="pagination-button" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
-          Next
+          {t("table.next")}
         </button>
       </div>
     </div>

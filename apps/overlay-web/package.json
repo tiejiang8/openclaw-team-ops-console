@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "corepack pnpm --filter @openclaw-team-ops/shared build && tsc -p tsconfig.json && vite build",
+    "typecheck": "corepack pnpm --filter @openclaw-team-ops/shared build && tsc -p tsconfig.json --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {

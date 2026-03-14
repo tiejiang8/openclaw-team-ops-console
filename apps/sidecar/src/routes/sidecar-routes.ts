@@ -1,5 +1,5 @@
-import { createResponseMeta, type ErrorResponse } from "@openclaw-team-ops/shared";
-import type { Router } from "express";
+import { createResponseMeta, type CollectionName, type ErrorResponse } from "@openclaw-team-ops/shared";
+import type { NextFunction, Request, Response, Router } from "express";
 import express from "express";
 
 import type { SidecarInventoryAdapter } from "../adapters/source-adapter.js";
@@ -7,18 +7,26 @@ import type { SidecarService } from "../services/sidecar-service.js";
 
 export function createSidecarRouter(service: SidecarService, adapter: SidecarInventoryAdapter): Router {
   const router = express.Router();
+  const selectCollection = (snapshot: Awaited<ReturnType<SidecarService["getSnapshot"]>>, collection: CollectionName) => ({
+    [collection]: snapshot.collections[collection],
+  });
+  const handleAsync =
+    (handler: (request: Request, response: Response, next: NextFunction) => Promise<void>) =>
+    (request: Request, response: Response, next: NextFunction) => {
+      Promise.resolve(handler(request, response, next)).catch(next);
+    };
 
   router.use((_request, response, next) => {
     response.setHeader("x-openclaw-ops-readonly", "true");
     next();
   });
 
-  router.get("/health", async (_request, response) => {
+  router.get("/health", handleAsync(async (_request, response) => {
     const adapterHealth = await adapter.healthCheck();
     response.json({
       service: "sidecar",
       status: adapterHealth.status === "ok" ? "ok" : "degraded",
-      time: new Date().toISOString(),
+      time: adapterHealth.observedAt,
       checks: [
         {
           name: adapterHealth.name,
@@ -27,37 +35,46 @@ export function createSidecarRouter(service: SidecarService, adapter: SidecarInv
         },
       ],
     });
-  });
+  }));
 
-  router.get("/sidecar/snapshot", async (_request, response) => {
+  router.get("/sidecar/snapshot", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot,
-      meta: createResponseMeta(snapshot.generatedAt, snapshot.source),
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: snapshot.collections,
+        warnings: snapshot.warnings,
+      }),
     });
-  });
+  }));
 
-  router.get("/sidecar/summary", async (_request, response) => {
+  router.get("/sidecar/summary", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.summary,
       runtimeStatuses: snapshot.runtimeStatuses,
-      meta: createResponseMeta(snapshot.generatedAt, snapshot.source),
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: snapshot.collections,
+        warnings: snapshot.warnings,
+      }),
     });
-  });
+  }));
 
-  router.get("/sidecar/agents", async (_request, response) => {
+  router.get("/sidecar/agents", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.agents,
       meta: {
-        ...createResponseMeta(snapshot.generatedAt, snapshot.source),
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "agents"),
+          warnings: snapshot.warnings,
+        }),
         count: snapshot.agents.length,
       },
     });
-  });
+  }));
 
-  router.get("/sidecar/agents/:id", async (request, response) => {
+  router.get("/sidecar/agents/:id", handleAsync(async (request, response) => {
     const snapshot = await service.getSnapshot();
     const agent = snapshot.agents.find((candidate) => candidate.id === request.params.id);
 
@@ -67,7 +84,10 @@ export function createSidecarRouter(service: SidecarService, adapter: SidecarInv
           code: "AGENT_NOT_FOUND",
           message: `Agent ${request.params.id} was not found`,
         },
-        meta: createResponseMeta(snapshot.generatedAt, snapshot.source),
+        meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "agents"),
+          warnings: snapshot.warnings,
+        }),
       };
       response.status(404).json(body);
       return;
@@ -75,61 +95,109 @@ export function createSidecarRouter(service: SidecarService, adapter: SidecarInv
 
     response.json({
       data: agent,
-      meta: createResponseMeta(snapshot.generatedAt, snapshot.source),
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: selectCollection(snapshot, "agents"),
+        warnings: snapshot.warnings,
+      }),
     });
-  });
+  }));
 
-  router.get("/sidecar/workspaces", async (_request, response) => {
+  router.get("/sidecar/workspaces", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.workspaces,
       meta: {
-        ...createResponseMeta(snapshot.generatedAt, snapshot.source),
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "workspaces"),
+          warnings: snapshot.warnings,
+        }),
         count: snapshot.workspaces.length,
       },
     });
-  });
+  }));
 
-  router.get("/sidecar/sessions", async (_request, response) => {
+  router.get("/sidecar/workspaces/:id/documents/:fileName", handleAsync(async (request, response) => {
+    const snapshot = await service.getSnapshot();
+    const workspaceId = request.params.id ?? "";
+    const fileName = request.params.fileName ?? "";
+    const document = await service.getWorkspaceDocument(workspaceId, fileName);
+
+    if (!document) {
+      const body: ErrorResponse = {
+        error: {
+          code: "WORKSPACE_DOCUMENT_NOT_FOUND",
+          message: `Workspace document ${fileName} was not found for ${workspaceId}`,
+        },
+        meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "workspaces"),
+          warnings: snapshot.warnings,
+        }),
+      };
+      response.status(404).json(body);
+      return;
+    }
+
+    response.json({
+      data: document,
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: selectCollection(snapshot, "workspaces"),
+        warnings: snapshot.warnings,
+      }),
+    });
+  }));
+
+  router.get("/sidecar/sessions", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.sessions,
       meta: {
-        ...createResponseMeta(snapshot.generatedAt, snapshot.source),
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "sessions"),
+          warnings: snapshot.warnings,
+        }),
         count: snapshot.sessions.length,
       },
     });
-  });
+  }));
 
-  router.get("/sidecar/bindings", async (_request, response) => {
+  router.get("/sidecar/bindings", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.bindings,
       meta: {
-        ...createResponseMeta(snapshot.generatedAt, snapshot.source),
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "bindings"),
+          warnings: snapshot.warnings,
+        }),
         count: snapshot.bindings.length,
       },
     });
-  });
+  }));
 
-  router.get("/sidecar/auth-profiles", async (_request, response) => {
+  router.get("/sidecar/auth-profiles", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.authProfiles,
       meta: {
-        ...createResponseMeta(snapshot.generatedAt, snapshot.source),
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          collections: selectCollection(snapshot, "authProfiles"),
+          warnings: snapshot.warnings,
+        }),
         count: snapshot.authProfiles.length,
       },
     });
-  });
+  }));
 
-  router.get("/sidecar/topology", async (_request, response) => {
+  router.get("/sidecar/topology", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({
       data: snapshot.topology,
-      meta: createResponseMeta(snapshot.generatedAt, snapshot.source),
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: selectCollection(snapshot, "topology"),
+        warnings: snapshot.warnings,
+      }),
     });
-  });
+  }));
 
   return router;
 }

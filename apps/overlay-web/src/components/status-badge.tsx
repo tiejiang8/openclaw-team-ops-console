@@ -1,5 +1,7 @@
 import type { EntityStatus } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../lib/i18n.js";
+
 const statusClassByValue: Record<string, string> = {
   healthy: "status-badge status-healthy",
   valid: "status-badge status-healthy",
@@ -19,7 +21,8 @@ const statusClassByValue: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: EntityStatus | string }) {
+  const { translateStatus } = useI18n();
   const className = statusClassByValue[status] ?? "status-badge status-unknown";
 
-  return <span className={className}>{status}</span>;
+  return <span className={className}>{translateStatus(status)}</span>;
 }

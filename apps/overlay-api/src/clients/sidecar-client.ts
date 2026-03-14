@@ -6,6 +6,7 @@ import type {
   HealthResponse,
   SummaryResponse,
   TopologyResponse,
+  WorkspaceDocumentResponse,
   WorkspacesResponse,
   SessionsResponse,
 } from "@openclaw-team-ops/shared";
@@ -52,6 +53,22 @@ export class SidecarClient {
 
   async getWorkspaces(): Promise<WorkspacesResponse> {
     return this.request<WorkspacesResponse>("/sidecar/workspaces");
+  }
+
+  async getWorkspaceDocument(workspaceId: string, fileName: string): Promise<WorkspaceDocumentResponse | undefined> {
+    const response = await this.fetch(
+      `/sidecar/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(fileName)}`,
+    );
+
+    if (response.status === 404) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Sidecar returned ${response.status} for workspace document ${workspaceId}/${fileName}`);
+    }
+
+    return (await response.json()) as WorkspaceDocumentResponse;
   }
 
   async getSessions(): Promise<SessionsResponse> {

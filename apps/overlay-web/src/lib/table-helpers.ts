@@ -1,9 +1,21 @@
 import type { SortDirection } from "./table-state.js";
 
-export type SortValue = string | number;
+export type SortValue = string | number | null | undefined;
 export type SortAccessor<T> = (item: T) => SortValue;
 
 function compareValues(left: SortValue, right: SortValue): number {
+  if (left == null && right == null) {
+    return 0;
+  }
+
+  if (left == null) {
+    return 1;
+  }
+
+  if (right == null) {
+    return -1;
+  }
+
   if (typeof left === "number" && typeof right === "number") {
     return left - right;
   }
@@ -58,12 +70,12 @@ export function paginateRows<T>(rows: T[], page: number, pageSize: number): Pagi
   };
 }
 
-export function includesSearch(haystack: string[], search: string): boolean {
+export function includesSearch(haystack: Array<string | null | undefined>, search: string): boolean {
   const normalizedSearch = search.trim().toLowerCase();
 
   if (normalizedSearch.length === 0) {
     return true;
   }
 
-  return haystack.some((candidate) => candidate.toLowerCase().includes(normalizedSearch));
+  return haystack.some((candidate) => typeof candidate === "string" && candidate.toLowerCase().includes(normalizedSearch));
 }

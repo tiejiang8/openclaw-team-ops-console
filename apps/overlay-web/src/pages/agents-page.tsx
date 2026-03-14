@@ -5,11 +5,13 @@ import { PaginationControls, SortableHeader, TableToolbar } from "../components/
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp, formatUptime } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useTableQueryState } from "../lib/table-state.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function AgentsPage() {
+  const { language, t, translateStatus } = useI18n();
   const tableState = useTableQueryState({
     defaultSortBy: "name",
     filterDefaults: {
@@ -44,7 +46,7 @@ export function AgentsPage() {
     }
 
     return data.agents.filter((agent) => {
-      const workspaceName = workspaceById.get(agent.workspaceId) ?? agent.workspaceId;
+      const workspaceName = agent.workspaceId ? (workspaceById.get(agent.workspaceId) ?? agent.workspaceId) : "-";
 
       const matchesSearch = includesSearch(
         [agent.id, agent.name, agent.role, agent.authProfileId, agent.workspaceId, workspaceName],
@@ -61,11 +63,11 @@ export function AgentsPage() {
     return sortRows(filteredRows, tableState.sortBy, tableState.sortDirection, {
       name: (agent) => agent.name,
       role: (agent) => agent.role,
-      workspace: (agent) => workspaceById.get(agent.workspaceId) ?? agent.workspaceId,
-      authProfile: (agent) => agent.authProfileId,
+      workspace: (agent) => (agent.workspaceId ? (workspaceById.get(agent.workspaceId) ?? agent.workspaceId) : "-"),
+      authProfile: (agent) => agent.authProfileId ?? "-",
       status: (agent) => agent.status,
-      heartbeat: (agent) => Date.parse(agent.lastHeartbeatAt),
-      uptime: (agent) => agent.uptimeSeconds,
+      heartbeat: (agent) => (agent.lastHeartbeatAt ? Date.parse(agent.lastHeartbeatAt) : null),
+      uptime: (agent) => agent.uptimeSeconds ?? null,
     });
   }, [filteredRows, tableState.sortBy, tableState.sortDirection, workspaceById]);
 
@@ -84,14 +86,14 @@ export function AgentsPage() {
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Agents</h2>
-        <p>Inventory of running agents, ownership, and operational status.</p>
+        <h2>{t("agents.title")}</h2>
+        <p>{t("agents.description")}</p>
       </header>
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input
           className="filter-input"
-          placeholder="Search by agent, role, workspace, or auth profile"
+          placeholder={t("agents.searchPlaceholder")}
           value={tableState.search}
           onChange={(event) => tableState.setSearch(event.target.value)}
         />
@@ -101,10 +103,10 @@ export function AgentsPage() {
           value={tableState.filters.status}
           onChange={(event) => tableState.setFilter("status", event.target.value)}
         >
-          <option value="all">All statuses</option>
+          <option value="all">{t("filter.allStatuses")}</option>
           {statusOptions.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {translateStatus(status)}
             </option>
           ))}
         </select>
@@ -114,7 +116,7 @@ export function AgentsPage() {
           value={tableState.filters.workspace}
           onChange={(event) => tableState.setFilter("workspace", event.target.value)}
         >
-          <option value="all">All workspaces</option>
+          <option value="all">{t("filter.allWorkspaces")}</option>
           {data?.workspaces.map((workspace) => (
             <option key={workspace.id} value={workspace.id}>
               {workspace.name}
@@ -128,13 +130,13 @@ export function AgentsPage() {
         error={error}
         onRetry={retry}
         isEmpty={isEmpty}
-        emptyTitle="No agents match current filters"
-        emptyMessage="Try resetting status/workspace filters or broadening your search."
+        emptyTitle={t("agents.emptyTitle")}
+        emptyMessage={t("agents.emptyMessage")}
       >
         <div className="panel">
           <div className="panel-header">
-            <h3>Agent Inventory</h3>
-            <p>{filteredRows.length} filtered rows</p>
+            <h3>{t("agents.panelTitle")}</h3>
+            <p>{t("table.filteredRows", { count: filteredRows.length })}</p>
           </div>
 
           <div className="table-wrap">
@@ -143,49 +145,49 @@ export function AgentsPage() {
                 <tr>
                   <SortableHeader
                     column="name"
-                    label="Agent"
+                    label={t("agents.table.agent")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="role"
-                    label="Role"
+                    label={t("agents.table.role")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="workspace"
-                    label="Workspace"
+                    label={t("agents.table.workspace")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="authProfile"
-                    label="Auth Profile"
+                    label={t("agents.table.authProfile")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="status"
-                    label="Status"
+                    label={t("agents.table.status")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="heartbeat"
-                    label="Last Heartbeat"
+                    label={t("agents.table.lastHeartbeat")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="uptime"
-                    label="Uptime"
+                    label={t("agents.table.uptime")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -201,13 +203,13 @@ export function AgentsPage() {
                       <div className="cell-subtitle">{agent.id}</div>
                     </td>
                     <td>{agent.role}</td>
-                    <td>{workspaceById.get(agent.workspaceId) ?? agent.workspaceId}</td>
-                    <td className="cell-mono">{agent.authProfileId}</td>
+                    <td>{agent.workspaceId ? (workspaceById.get(agent.workspaceId) ?? agent.workspaceId) : "-"}</td>
+                    <td className="cell-mono">{agent.authProfileId ?? "-"}</td>
                     <td>
                       <StatusBadge status={agent.status} />
                     </td>
-                    <td>{formatTimestamp(agent.lastHeartbeatAt)}</td>
-                    <td className="cell-align-right">{formatUptime(agent.uptimeSeconds)}</td>
+                    <td>{formatTimestamp(agent.lastHeartbeatAt, language)}</td>
+                    <td className="cell-align-right">{formatUptime(agent.uptimeSeconds, language)}</td>
                   </tr>
                 ))}
               </tbody>

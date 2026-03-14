@@ -5,6 +5,7 @@ import { PaginationControls, SortableHeader, TableToolbar } from "../components/
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useTableQueryState } from "../lib/table-state.js";
 import { useResource } from "../lib/use-resource.js";
@@ -18,11 +19,12 @@ interface SessionRow {
   bindingId: string;
   channel: string;
   status: string;
-  lastActivityAt: string;
-  messageCount: number;
+  lastActivityAt: string | null;
+  messageCount: number | null;
 }
 
 export function SessionsPage() {
+  const { language, t, translateStatus } = useI18n();
   const tableState = useTableQueryState({
     defaultSortBy: "lastActivityAt",
     defaultSortDirection: "desc",
@@ -60,15 +62,15 @@ export function SessionsPage() {
   const rows = useMemo<SessionRow[]>(() => {
     return (data?.sessions ?? []).map((session) => ({
       id: session.id,
-      workspaceId: session.workspaceId,
-      workspaceName: workspaceById.get(session.workspaceId) ?? session.workspaceId,
-      agentId: session.agentId,
-      agentName: agentById.get(session.agentId) ?? session.agentId,
-      bindingId: session.bindingId,
+      workspaceId: session.workspaceId ?? "-",
+      workspaceName: session.workspaceId ? (workspaceById.get(session.workspaceId) ?? session.workspaceId) : "-",
+      agentId: session.agentId ?? "-",
+      agentName: session.agentId ? (agentById.get(session.agentId) ?? session.agentId) : "-",
+      bindingId: session.bindingId ?? "-",
       channel: session.channel,
       status: session.status,
-      lastActivityAt: session.lastActivityAt,
-      messageCount: session.messageCount,
+      lastActivityAt: session.lastActivityAt ?? null,
+      messageCount: session.messageCount ?? null,
     }));
   }, [agentById, data, workspaceById]);
 
@@ -93,7 +95,7 @@ export function SessionsPage() {
       binding: (session) => session.bindingId,
       channel: (session) => session.channel,
       status: (session) => session.status,
-      lastActivityAt: (session) => Date.parse(session.lastActivityAt),
+      lastActivityAt: (session) => (session.lastActivityAt ? Date.parse(session.lastActivityAt) : null),
       messageCount: (session) => session.messageCount,
     });
   }, [filteredRows, tableState.sortBy, tableState.sortDirection]);
@@ -121,14 +123,14 @@ export function SessionsPage() {
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Sessions</h2>
-        <p>Session inventory and activity state across workspaces and channels.</p>
+        <h2>{t("sessions.title")}</h2>
+        <p>{t("sessions.description")}</p>
       </header>
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input
           className="filter-input"
-          placeholder="Search by session, workspace, agent, binding, or channel"
+          placeholder={t("sessions.searchPlaceholder")}
           value={tableState.search}
           onChange={(event) => tableState.setSearch(event.target.value)}
         />
@@ -138,10 +140,10 @@ export function SessionsPage() {
           value={tableState.filters.status}
           onChange={(event) => tableState.setFilter("status", event.target.value)}
         >
-          <option value="all">All statuses</option>
+          <option value="all">{t("filter.allStatuses")}</option>
           {statusOptions.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {translateStatus(status)}
             </option>
           ))}
         </select>
@@ -151,7 +153,7 @@ export function SessionsPage() {
           value={tableState.filters.channel}
           onChange={(event) => tableState.setFilter("channel", event.target.value)}
         >
-          <option value="all">All channels</option>
+          <option value="all">{t("filter.allChannels")}</option>
           {channelOptions.map((channel) => (
             <option key={channel} value={channel}>
               {channel}
@@ -165,13 +167,13 @@ export function SessionsPage() {
         error={error}
         onRetry={retry}
         isEmpty={isEmpty}
-        emptyTitle="No sessions match current filters"
-        emptyMessage="Try clearing status/channel filters or broadening search terms."
+        emptyTitle={t("sessions.emptyTitle")}
+        emptyMessage={t("sessions.emptyMessage")}
       >
         <div className="panel">
           <div className="panel-header">
-            <h3>Session Inventory</h3>
-            <p>{filteredRows.length} filtered rows</p>
+            <h3>{t("sessions.panelTitle")}</h3>
+            <p>{t("table.filteredRows", { count: filteredRows.length })}</p>
           </div>
 
           <div className="table-wrap">
@@ -180,56 +182,56 @@ export function SessionsPage() {
                 <tr>
                   <SortableHeader
                     column="id"
-                    label="Session"
+                    label={t("sessions.table.session")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="workspace"
-                    label="Workspace"
+                    label={t("sessions.table.workspace")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="agent"
-                    label="Agent"
+                    label={t("sessions.table.agent")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="binding"
-                    label="Binding"
+                    label={t("sessions.table.binding")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="channel"
-                    label="Channel"
+                    label={t("sessions.table.channel")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="status"
-                    label="Status"
+                    label={t("sessions.table.status")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="lastActivityAt"
-                    label="Last Activity"
+                    label={t("sessions.table.lastActivity")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="messageCount"
-                    label="Messages"
+                    label={t("sessions.table.messages")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -248,8 +250,8 @@ export function SessionsPage() {
                     <td>
                       <StatusBadge status={session.status} />
                     </td>
-                    <td>{formatTimestamp(session.lastActivityAt)}</td>
-                    <td className="cell-align-right">{session.messageCount}</td>
+                    <td>{formatTimestamp(session.lastActivityAt, language)}</td>
+                    <td className="cell-align-right">{session.messageCount ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>

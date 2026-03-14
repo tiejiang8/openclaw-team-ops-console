@@ -17,6 +17,8 @@ Returns:
 - `InventorySummary` (`data`)
 - `runtimeStatuses`
 - read-only `meta`
+- `meta.collections` with per-collection freshness, status, and counts
+- `meta.warnings` when the snapshot is partial, stale, or otherwise degraded
 
 ## Agents
 
@@ -71,6 +73,27 @@ Most successful payloads include:
 - `meta.generatedAt`
 - `meta.source` (`mock`, `openclaw`, or `mixed`)
 - `meta.readOnly = true`
+- optional `meta.collections`
+- optional `meta.warnings`
+
+List endpoints expose collection-level metadata for their primary collection. Summary responses can expose metadata for all collections carried by the snapshot.
+
+## Degraded-mode Contract
+
+Phase 1.2 hardens the API contract for future real adapters:
+
+- entity records may omit non-identity fields that are unavailable from an external source
+- collection metadata distinguishes `complete`, `partial`, and `unavailable` coverage
+- freshness distinguishes `fresh`, `stale`, and `unknown`
+- topology edges are omitted instead of emitting broken references when upstream identifiers are missing
+- sidecar and overlay-api still return read-only responses in degraded and failure cases
+
+## Error Responses
+
+Read failures still preserve the read-only contract:
+
+- sidecar returns `ADAPTER_UNAVAILABLE`
+- overlay-api returns `UPSTREAM_UNAVAILABLE`
 
 ## v0.1 Guarantees
 

@@ -6,15 +6,16 @@
   "main": "dist/main.js",
   "types": "dist/main.d.ts",
   "scripts": {
-    "dev": "node --import tsx src/main.ts",
+    "dev": "node ../../scripts/run-node-with-root-env.mjs --import tsx src/main.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/main.js"
+    "start": "node ../../scripts/run-node-with-root-env.mjs dist/main.js"
   },
   "dependencies": {
     "@openclaw-team-ops/shared": "workspace:*",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "json5": "^2.2.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

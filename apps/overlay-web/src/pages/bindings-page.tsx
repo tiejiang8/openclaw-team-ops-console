@@ -5,6 +5,7 @@ import { PaginationControls, SortableHeader, TableToolbar } from "../components/
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useTableQueryState } from "../lib/table-state.js";
 import { useResource } from "../lib/use-resource.js";
@@ -19,10 +20,11 @@ interface BindingRow {
   workspaceName: string;
   status: string;
   description: string;
-  updatedAt: string;
+  updatedAt: string | null;
 }
 
 export function BindingsPage() {
+  const { language, t, translateRouteType, translateStatus } = useI18n();
   const tableState = useTableQueryState({
     defaultSortBy: "updatedAt",
     defaultSortDirection: "desc",
@@ -63,13 +65,13 @@ export function BindingsPage() {
       id: binding.id,
       routeType: binding.routeType,
       source: binding.source,
-      targetAgentId: binding.targetAgentId,
-      targetAgentName: agentById.get(binding.targetAgentId) ?? binding.targetAgentId,
-      workspaceId: binding.workspaceId,
-      workspaceName: workspaceById.get(binding.workspaceId) ?? binding.workspaceId,
+      targetAgentId: binding.targetAgentId ?? "-",
+      targetAgentName: binding.targetAgentId ? (agentById.get(binding.targetAgentId) ?? binding.targetAgentId) : "-",
+      workspaceId: binding.workspaceId ?? "-",
+      workspaceName: binding.workspaceId ? (workspaceById.get(binding.workspaceId) ?? binding.workspaceId) : "-",
       status: binding.status,
-      description: binding.description,
-      updatedAt: binding.updatedAt,
+      description: binding.description ?? "-",
+      updatedAt: binding.updatedAt ?? null,
     }));
   }, [agentById, data, workspaceById]);
 
@@ -95,7 +97,7 @@ export function BindingsPage() {
       target: (binding) => binding.targetAgentName,
       workspace: (binding) => binding.workspaceName,
       status: (binding) => binding.status,
-      updatedAt: (binding) => Date.parse(binding.updatedAt),
+      updatedAt: (binding) => (binding.updatedAt ? Date.parse(binding.updatedAt) : null),
     });
   }, [filteredRows, tableState.sortBy, tableState.sortDirection]);
 
@@ -122,14 +124,14 @@ export function BindingsPage() {
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Bindings</h2>
-        <p>Route and binding inventory for channels, APIs, schedules, and webhooks.</p>
+        <h2>{t("bindings.title")}</h2>
+        <p>{t("bindings.description")}</p>
       </header>
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input
           className="filter-input"
-          placeholder="Search by binding, source, description, target, or workspace"
+          placeholder={t("bindings.searchPlaceholder")}
           value={tableState.search}
           onChange={(event) => tableState.setSearch(event.target.value)}
         />
@@ -139,10 +141,10 @@ export function BindingsPage() {
           value={tableState.filters.status}
           onChange={(event) => tableState.setFilter("status", event.target.value)}
         >
-          <option value="all">All statuses</option>
+          <option value="all">{t("filter.allStatuses")}</option>
           {statusOptions.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {translateStatus(status)}
             </option>
           ))}
         </select>
@@ -152,10 +154,10 @@ export function BindingsPage() {
           value={tableState.filters.routeType}
           onChange={(event) => tableState.setFilter("routeType", event.target.value)}
         >
-          <option value="all">All route types</option>
+          <option value="all">{t("filter.allRouteTypes")}</option>
           {routeTypeOptions.map((routeType) => (
             <option key={routeType} value={routeType}>
-              {routeType}
+              {translateRouteType(routeType)}
             </option>
           ))}
         </select>
@@ -165,7 +167,7 @@ export function BindingsPage() {
           value={tableState.filters.workspace}
           onChange={(event) => tableState.setFilter("workspace", event.target.value)}
         >
-          <option value="all">All workspaces</option>
+          <option value="all">{t("filter.allWorkspaces")}</option>
           {data?.workspaces.map((workspace) => (
             <option key={workspace.id} value={workspace.id}>
               {workspace.name}
@@ -179,13 +181,13 @@ export function BindingsPage() {
         error={error}
         onRetry={retry}
         isEmpty={isEmpty}
-        emptyTitle="No bindings match current filters"
-        emptyMessage="Try broadening search terms or adjusting route/status filters."
+        emptyTitle={t("bindings.emptyTitle")}
+        emptyMessage={t("bindings.emptyMessage")}
       >
         <div className="panel">
           <div className="panel-header">
-            <h3>Binding Inventory</h3>
-            <p>{filteredRows.length} filtered rows</p>
+            <h3>{t("bindings.panelTitle")}</h3>
+            <p>{t("table.filteredRows", { count: filteredRows.length })}</p>
           </div>
 
           <div className="table-wrap">
@@ -194,49 +196,49 @@ export function BindingsPage() {
                 <tr>
                   <SortableHeader
                     column="id"
-                    label="Binding"
+                    label={t("bindings.table.binding")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="routeType"
-                    label="Route Type"
+                    label={t("bindings.table.routeType")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="source"
-                    label="Source"
+                    label={t("bindings.table.source")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="target"
-                    label="Target Agent"
+                    label={t("bindings.table.targetAgent")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="workspace"
-                    label="Workspace"
+                    label={t("bindings.table.workspace")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="status"
-                    label="Status"
+                    label={t("bindings.table.status")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="updatedAt"
-                    label="Updated"
+                    label={t("bindings.table.updated")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -250,14 +252,14 @@ export function BindingsPage() {
                       <div className="cell-title">{binding.id}</div>
                       <div className="cell-subtitle">{binding.description}</div>
                     </td>
-                    <td>{binding.routeType}</td>
+                    <td>{translateRouteType(binding.routeType)}</td>
                     <td>{binding.source}</td>
                     <td>{binding.targetAgentName}</td>
                     <td>{binding.workspaceName}</td>
                     <td>
                       <StatusBadge status={binding.status} />
                     </td>
-                    <td>{formatTimestamp(binding.updatedAt)}</td>
+                    <td>{formatTimestamp(binding.updatedAt, language)}</td>
                   </tr>
                 ))}
               </tbody>

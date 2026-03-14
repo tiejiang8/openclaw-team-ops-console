@@ -105,6 +105,31 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
     }
   });
 
+  router.get("/api/workspaces/:id/documents/:fileName", async (request, response, next) => {
+    try {
+      const workspaceId = request.params.id ?? "";
+      const fileName = request.params.fileName ?? "";
+      const document = await service.getWorkspaceDocument(workspaceId, fileName);
+
+      if (!document) {
+        const body: ErrorResponse = {
+          error: {
+            code: "WORKSPACE_DOCUMENT_NOT_FOUND",
+            message: `Workspace document ${fileName} was not found for ${workspaceId}`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(document);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/api/sessions", async (_request, response, next) => {
     try {
       response.json(await service.getSessions());

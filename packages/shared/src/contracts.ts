@@ -1,19 +1,26 @@
 import type {
   Agent,
+  CollectionMetadata,
+  CollectionName,
   AuthProfile,
   BindingRoute,
   InventorySummary,
   RuntimeStatus,
   Session,
+  SnapshotSource,
+  SnapshotWarning,
   SystemSnapshot,
   TopologyView,
   Workspace,
+  WorkspaceDocument,
 } from "./domain.js";
 
 export interface ResponseMeta {
   generatedAt: string;
-  source: "mock" | "openclaw" | "mixed";
+  source: SnapshotSource;
   readOnly: true;
+  collections?: Partial<Record<CollectionName, CollectionMetadata>>;
+  warnings?: SnapshotWarning[];
 }
 
 export interface ListResponse<T> {
@@ -71,6 +78,7 @@ export interface SnapshotResponse {
 export type AgentsResponse = ListResponse<Agent>;
 export type AgentResponse = ItemResponse<Agent>;
 export type WorkspacesResponse = ListResponse<Workspace>;
+export type WorkspaceDocumentResponse = ItemResponse<WorkspaceDocument>;
 export type SessionsResponse = ListResponse<Session>;
 export type BindingsResponse = ListResponse<BindingRoute>;
 export type AuthProfilesResponse = ListResponse<AuthProfile>;

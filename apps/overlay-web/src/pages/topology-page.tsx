@@ -5,6 +5,7 @@ import { MetricCard } from "../components/metric-card.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useTableQueryState } from "../lib/table-state.js";
 import { useResource } from "../lib/use-resource.js";
@@ -21,6 +22,7 @@ interface EdgeRow {
 }
 
 export function TopologyPage() {
+  const { language, t, translateNodeType } = useI18n();
   const tableState = useTableQueryState({
     defaultSortBy: "relation",
     filterDefaults: {
@@ -115,26 +117,34 @@ export function TopologyPage() {
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Topology and Relationships</h2>
-        <p>Relationship view for workspace, agent, binding, session, and auth-profile linkages.</p>
+        <h2>{t("topology.title")}</h2>
+        <p>{t("topology.description")}</p>
       </header>
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (
           <>
             <div className="metrics-grid">
-              <MetricCard label="Nodes" value={data.data.nodes.length} detail={`snapshot ${formatTimestamp(data.meta.generatedAt)}`} />
-              <MetricCard label="Edges" value={data.data.edges.length} detail={`${filteredRows.length} after filters`} />
-              <MetricCard label="Workspace Nodes" value={nodeCounts.get("workspace") ?? 0} />
-              <MetricCard label="Agent Nodes" value={nodeCounts.get("agent") ?? 0} />
-              <MetricCard label="Session Nodes" value={nodeCounts.get("session") ?? 0} />
-              <MetricCard label="Auth Nodes" value={nodeCounts.get("auth-profile") ?? 0} />
+              <MetricCard
+                label={t("topology.metric.nodes")}
+                value={data.data.nodes.length}
+                detail={t("common.snapshotAt", { time: formatTimestamp(data.meta.generatedAt, language) })}
+              />
+              <MetricCard
+                label={t("topology.metric.edges")}
+                value={data.data.edges.length}
+                detail={t("common.afterFilters", { count: filteredRows.length })}
+              />
+              <MetricCard label={t("topology.metric.workspaceNodes")} value={nodeCounts.get("workspace") ?? 0} />
+              <MetricCard label={t("topology.metric.agentNodes")} value={nodeCounts.get("agent") ?? 0} />
+              <MetricCard label={t("topology.metric.sessionNodes")} value={nodeCounts.get("session") ?? 0} />
+              <MetricCard label={t("topology.metric.authNodes")} value={nodeCounts.get("auth-profile") ?? 0} />
             </div>
 
             <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
               <input
                 className="filter-input"
-                placeholder="Search by relation, node type, or entity id"
+                placeholder={t("topology.searchPlaceholder")}
                 value={tableState.search}
                 onChange={(event) => tableState.setSearch(event.target.value)}
               />
@@ -144,7 +154,7 @@ export function TopologyPage() {
                 value={tableState.filters.relation}
                 onChange={(event) => tableState.setFilter("relation", event.target.value)}
               >
-                <option value="all">All relations</option>
+                <option value="all">{t("filter.allRelations")}</option>
                 {relationOptions.map((relation) => (
                   <option key={relation} value={relation}>
                     {relation}
@@ -157,10 +167,10 @@ export function TopologyPage() {
                 value={tableState.filters.fromType}
                 onChange={(event) => tableState.setFilter("fromType", event.target.value)}
               >
-                <option value="all">All source node types</option>
+                <option value="all">{t("filter.allSourceNodeTypes")}</option>
                 {fromTypeOptions.map((fromType) => (
                   <option key={fromType} value={fromType}>
-                    {fromType}
+                    {translateNodeType(fromType)}
                   </option>
                 ))}
               </select>
@@ -170,13 +180,13 @@ export function TopologyPage() {
               loading={false}
               error={null}
               isEmpty={isEmpty}
-              emptyTitle="No relationships match current filters"
-              emptyMessage="Try broadening relation/node filters or search terms."
+              emptyTitle={t("topology.emptyTitle")}
+              emptyMessage={t("topology.emptyMessage")}
             >
               <div className="panel">
                 <div className="panel-header">
-                  <h3>Relationship Edges</h3>
-                  <p>{filteredRows.length} filtered rows</p>
+                  <h3>{t("topology.panelTitle")}</h3>
+                  <p>{t("table.filteredRows", { count: filteredRows.length })}</p>
                 </div>
 
                 <div className="table-wrap">
@@ -185,35 +195,35 @@ export function TopologyPage() {
                       <tr>
                         <SortableHeader
                           column="fromType"
-                          label="From Type"
+                          label={t("topology.table.fromType")}
                           sortBy={tableState.sortBy}
                           sortDirection={tableState.sortDirection}
                           onSort={tableState.setSort}
                         />
                         <SortableHeader
                           column="from"
-                          label="From"
+                          label={t("topology.table.from")}
                           sortBy={tableState.sortBy}
                           sortDirection={tableState.sortDirection}
                           onSort={tableState.setSort}
                         />
                         <SortableHeader
                           column="relation"
-                          label="Relation"
+                          label={t("topology.table.relation")}
                           sortBy={tableState.sortBy}
                           sortDirection={tableState.sortDirection}
                           onSort={tableState.setSort}
                         />
                         <SortableHeader
                           column="toType"
-                          label="To Type"
+                          label={t("topology.table.toType")}
                           sortBy={tableState.sortBy}
                           sortDirection={tableState.sortDirection}
                           onSort={tableState.setSort}
                         />
                         <SortableHeader
                           column="to"
-                          label="To"
+                          label={t("topology.table.to")}
                           sortBy={tableState.sortBy}
                           sortDirection={tableState.sortDirection}
                           onSort={tableState.setSort}
@@ -223,13 +233,13 @@ export function TopologyPage() {
                     <tbody>
                       {paginated.pageItems.map((edge) => (
                         <tr key={edge.id}>
-                          <td>{edge.fromType}</td>
+                          <td>{translateNodeType(edge.fromType)}</td>
                           <td>
                             <div className="cell-title">{edge.fromLabel}</div>
                             <div className="cell-subtitle">{edge.fromId}</div>
                           </td>
                           <td>{edge.relation}</td>
-                          <td>{edge.toType}</td>
+                          <td>{translateNodeType(edge.toType)}</td>
                           <td>
                             <div className="cell-title">{edge.toLabel}</div>
                             <div className="cell-subtitle">{edge.toId}</div>

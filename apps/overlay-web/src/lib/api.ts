@@ -7,11 +7,12 @@ import type {
   RuntimeStatusesResponse,
   SummaryResponse,
   TopologyResponse,
+  WorkspaceDocumentResponse,
   WorkspacesResponse,
   SessionsResponse,
 } from "@openclaw-team-ops/shared";
 
-const API_BASE_URL = import.meta.env.VITE_OVERLAY_API_URL ?? "http://localhost:4300";
+const API_BASE_URL = (import.meta.env.VITE_OVERLAY_API_URL ?? "").replace(/\/$/, "");
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -33,6 +34,10 @@ export const overlayApi = {
   getAgents: () => request<AgentsResponse>("/api/agents"),
   getAgent: (agentId: string) => request<AgentResponse>(`/api/agents/${encodeURIComponent(agentId)}`),
   getWorkspaces: () => request<WorkspacesResponse>("/api/workspaces"),
+  getWorkspaceDocument: (workspaceId: string, fileName: string) =>
+    request<WorkspaceDocumentResponse>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(fileName)}`,
+    ),
   getSessions: () => request<SessionsResponse>("/api/sessions"),
   getBindings: () => request<BindingsResponse>("/api/bindings"),
   getAuthProfiles: () => request<AuthProfilesResponse>("/api/auth-profiles"),

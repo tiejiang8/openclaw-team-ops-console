@@ -19,6 +19,7 @@ OpenClaw Team Ops Console is an **external sidecar product**. It integrates with
 - adapters are swappable behind `SidecarInventoryAdapter`
 - overlay-api consumes sidecar outputs and normalizes contracts
 - overlay-web consumes only overlay-api contracts
+- degraded or partial external reads must surface via collection metadata and warnings, not hidden assumptions
 
 ## Non-goals for v0.1
 
@@ -37,6 +38,12 @@ When integrating real OpenClaw sources later:
 2. keep adapter output compliant with `packages/shared` domain contracts
 3. preserve overlay-api endpoint stability
 4. avoid introducing coupling to OpenClaw internal codepaths
+5. use only confirmed external read-only surfaces documented in `docs/external-data-sources.md`
+
+## Explicit Exclusions
+
+- `openclaw doctor` is not a valid adapter source because it can repair or mutate state.
+- Any gateway/UI/API surface that is not externally documented or clearly stable should remain a future option only.
 
 ## Security and Compliance Posture (v0.1)
 

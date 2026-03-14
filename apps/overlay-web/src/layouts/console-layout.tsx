@@ -1,24 +1,50 @@
 import { NavLink, Outlet } from "react-router-dom";
 
-const navItems = [
-  { to: "/", label: "Overview" },
-  { to: "/agents", label: "Agents" },
-  { to: "/workspaces", label: "Workspaces" },
-  { to: "/sessions", label: "Sessions" },
-  { to: "/bindings", label: "Bindings" },
-  { to: "/auth-profiles", label: "Auth Profiles" },
-  { to: "/topology", label: "Topology" },
-];
+import { RuntimeSourceMarker } from "../components/runtime-source-marker.js";
+import { useI18n } from "../lib/i18n.js";
 
 export function ConsoleLayout() {
+  const { language, setLanguage, t } = useI18n();
+  const navItems = [
+    { to: "/", label: t("nav.overview") },
+    { to: "/agents", label: t("nav.agents") },
+    { to: "/workspaces", label: t("nav.workspaces") },
+    { to: "/sessions", label: t("nav.sessions") },
+    { to: "/bindings", label: t("nav.bindings") },
+    { to: "/auth-profiles", label: t("nav.authProfiles") },
+    { to: "/topology", label: t("nav.topology") },
+  ];
+
   return (
     <div className="app-shell">
       <aside className="sidebar fade-in-up">
         <div>
-          <p className="product-eyebrow">OpenClaw Team Ops Console</p>
-          <h1 className="product-name">OpenClaw Multi-Agent Control</h1>
-          <p className="product-subtitle">Read-only operational visibility layer</p>
+          <p className="product-eyebrow">{t("product.eyebrow")}</p>
+          <h1 className="product-name">{t("product.name")}</h1>
+          <p className="product-subtitle">{t("product.subtitle")}</p>
         </div>
+
+        <section className="language-switcher" aria-label={t("language.label")}>
+          <p className="language-switcher-label">{t("language.label")}</p>
+          <div className="language-switcher-actions">
+            <button
+              type="button"
+              className={`language-button${language === "en" ? " language-button-active" : ""}`}
+              onClick={() => setLanguage("en")}
+            >
+              {t("language.en")}
+            </button>
+            <button
+              type="button"
+              className={`language-button${language === "zh" ? " language-button-active" : ""}`}
+              onClick={() => setLanguage("zh")}
+            >
+              {t("language.zh")}
+            </button>
+          </div>
+        </section>
+
+        <RuntimeSourceMarker />
 
         <nav className="nav-list">
           {navItems.map((item) => (

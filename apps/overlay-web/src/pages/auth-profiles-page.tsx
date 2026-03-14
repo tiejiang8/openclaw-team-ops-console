@@ -5,6 +5,7 @@ import { PaginationControls, SortableHeader, TableToolbar } from "../components/
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useTableQueryState } from "../lib/table-state.js";
 import { useResource } from "../lib/use-resource.js";
@@ -22,6 +23,7 @@ interface AuthProfileRow {
 }
 
 export function AuthProfilesPage() {
+  const { language, t, translateProvider, translateStatus } = useI18n();
   const tableState = useTableQueryState({
     defaultSortBy: "name",
     filterDefaults: {
@@ -55,6 +57,10 @@ export function AuthProfilesPage() {
     const counts = new Map<string, number>();
 
     for (const agent of data?.agents ?? []) {
+      if (!agent.authProfileId) {
+        continue;
+      }
+
       counts.set(agent.authProfileId, (counts.get(agent.authProfileId) ?? 0) + 1);
     }
 
@@ -67,8 +73,8 @@ export function AuthProfilesPage() {
       name: profile.name,
       provider: profile.provider,
       status: profile.status,
-      scopes: profile.scopes,
-      workspaceNames: profile.workspaceIds.map((workspaceId) => workspaceById.get(workspaceId) ?? workspaceId),
+      scopes: profile.scopes ?? [],
+      workspaceNames: (profile.workspaceIds ?? []).map((workspaceId) => workspaceById.get(workspaceId) ?? workspaceId),
       linkedAgents: linkedAgentCountByAuthProfile.get(profile.id) ?? 0,
       expiresAt: profile.expiresAt ?? null,
       lastUsedAt: profile.lastUsedAt ?? null,
@@ -124,14 +130,14 @@ export function AuthProfilesPage() {
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Auth Profiles</h2>
-        <p>Credential profile inventory, scope coverage, and expiry posture.</p>
+        <h2>{t("authProfiles.title")}</h2>
+        <p>{t("authProfiles.description")}</p>
       </header>
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input
           className="filter-input"
-          placeholder="Search by profile, provider, scope, or workspace"
+          placeholder={t("authProfiles.searchPlaceholder")}
           value={tableState.search}
           onChange={(event) => tableState.setSearch(event.target.value)}
         />
@@ -141,10 +147,10 @@ export function AuthProfilesPage() {
           value={tableState.filters.status}
           onChange={(event) => tableState.setFilter("status", event.target.value)}
         >
-          <option value="all">All statuses</option>
+          <option value="all">{t("filter.allStatuses")}</option>
           {statusOptions.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {translateStatus(status)}
             </option>
           ))}
         </select>
@@ -154,10 +160,10 @@ export function AuthProfilesPage() {
           value={tableState.filters.provider}
           onChange={(event) => tableState.setFilter("provider", event.target.value)}
         >
-          <option value="all">All providers</option>
+          <option value="all">{t("filter.allProviders")}</option>
           {providerOptions.map((provider) => (
             <option key={provider} value={provider}>
-              {provider}
+              {translateProvider(provider)}
             </option>
           ))}
         </select>
@@ -168,13 +174,13 @@ export function AuthProfilesPage() {
         error={error}
         onRetry={retry}
         isEmpty={isEmpty}
-        emptyTitle="No auth profiles match current filters"
-        emptyMessage="Try expanding search terms or clearing status/provider filters."
+        emptyTitle={t("authProfiles.emptyTitle")}
+        emptyMessage={t("authProfiles.emptyMessage")}
       >
         <div className="panel">
           <div className="panel-header">
-            <h3>Auth Profile Inventory</h3>
-            <p>{filteredRows.length} filtered rows</p>
+            <h3>{t("authProfiles.panelTitle")}</h3>
+            <p>{t("table.filteredRows", { count: filteredRows.length })}</p>
           </div>
 
           <div className="table-wrap">
@@ -183,28 +189,28 @@ export function AuthProfilesPage() {
                 <tr>
                   <SortableHeader
                     column="name"
-                    label="Profile"
+                    label={t("authProfiles.table.profile")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="provider"
-                    label="Provider"
+                    label={t("authProfiles.table.provider")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="status"
-                    label="Status"
+                    label={t("authProfiles.table.status")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="scopeCount"
-                    label="Scopes"
+                    label={t("authProfiles.table.scopes")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -212,7 +218,7 @@ export function AuthProfilesPage() {
                   />
                   <SortableHeader
                     column="workspaceCount"
-                    label="Workspaces"
+                    label={t("authProfiles.table.workspaces")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -220,7 +226,7 @@ export function AuthProfilesPage() {
                   />
                   <SortableHeader
                     column="linkedAgents"
-                    label="Linked Agents"
+                    label={t("authProfiles.table.linkedAgents")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -228,14 +234,14 @@ export function AuthProfilesPage() {
                   />
                   <SortableHeader
                     column="expiresAt"
-                    label="Expires"
+                    label={t("authProfiles.table.expires")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
                   />
                   <SortableHeader
                     column="lastUsedAt"
-                    label="Last Used"
+                    label={t("authProfiles.table.lastUsed")}
                     sortBy={tableState.sortBy}
                     sortDirection={tableState.sortDirection}
                     onSort={tableState.setSort}
@@ -249,15 +255,15 @@ export function AuthProfilesPage() {
                       <div className="cell-title">{profile.name}</div>
                       <div className="cell-subtitle">{profile.id}</div>
                     </td>
-                    <td>{profile.provider}</td>
+                    <td>{translateProvider(profile.provider)}</td>
                     <td>
                       <StatusBadge status={profile.status} />
                     </td>
                     <td className="cell-align-right">{profile.scopes.length}</td>
                     <td className="cell-align-right">{profile.workspaceNames.length}</td>
                     <td className="cell-align-right">{profile.linkedAgents}</td>
-                    <td>{profile.expiresAt ? formatTimestamp(profile.expiresAt) : "-"}</td>
-                    <td>{profile.lastUsedAt ? formatTimestamp(profile.lastUsedAt) : "-"}</td>
+                    <td>{profile.expiresAt ? formatTimestamp(profile.expiresAt, language) : "-"}</td>
+                    <td>{profile.lastUsedAt ? formatTimestamp(profile.lastUsedAt, language) : "-"}</td>
                   </tr>
                 ))}
               </tbody>

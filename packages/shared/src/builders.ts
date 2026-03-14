@@ -1,10 +1,16 @@
 import type {
   Agent,
+  CollectionFreshness,
+  CollectionMetadata,
+  CollectionName,
+  CollectionStatus,
   AuthProfile,
   BindingRoute,
   InventorySummary,
   RuntimeStatus,
   Session,
+  SnapshotSource,
+  SnapshotWarning,
   TopologyEdge,
   TopologyNode,
   TopologyView,
@@ -58,6 +64,10 @@ export function buildTopologyView(input: {
   authProfiles: AuthProfile[];
 }): TopologyView {
   const { generatedAt, agents, workspaces, sessions, bindings, authProfiles } = input;
+  const workspaceIds = new Set(workspaces.map((workspace) => workspace.id));
+  const agentIds = new Set(agents.map((agent) => agent.id));
+  const bindingIds = new Set(bindings.map((binding) => binding.id));
+  const authProfileIds = new Set(authProfiles.map((authProfile) => authProfile.id));
 
   const nodes: TopologyNode[] = [
     ...workspaces.map((workspace) => ({
@@ -72,21 +82,21 @@ export function buildTopologyView(input: {
       nodeType: "agent" as const,
       label: agent.name,
       status: agent.status,
-      workspaceId: agent.workspaceId,
+      ...(agent.workspaceId ? { workspaceId: agent.workspaceId } : {}),
     })),
     ...sessions.map((session) => ({
       id: session.id,
       nodeType: "session" as const,
       label: session.id,
       status: session.status,
-      workspaceId: session.workspaceId,
+      ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
     })),
     ...bindings.map((binding) => ({
       id: binding.id,
       nodeType: "binding" as const,
       label: binding.id,
       status: binding.status,
-      workspaceId: binding.workspaceId,
+      ...(binding.workspaceId ? { workspaceId: binding.workspaceId } : {}),
     })),
     ...authProfiles.map((authProfile) => ({
       id: authProfile.id,
@@ -97,78 +107,117 @@ export function buildTopologyView(input: {
   ];
 
   const edges: TopologyEdge[] = [];
+  const pushEdge = (edge: TopologyEdge, isValid: boolean) => {
+    if (isValid) {
+      edges.push(edge);
+    }
+  };
 
   for (const agent of agents) {
-    edges.push({
-      fromType: "workspace",
-      fromId: agent.workspaceId,
-      toType: "agent",
-      toId: agent.id,
-      relation: "contains-agent",
-    });
+    const workspaceId = agent.workspaceId;
+    const authProfileId = agent.authProfileId;
 
-    edges.push({
-      fromType: "auth-profile",
-      fromId: agent.authProfileId,
-      toType: "agent",
-      toId: agent.id,
-      relation: "authenticates-agent",
-    });
+    pushEdge(
+      {
+        fromType: "workspace",
+        fromId: workspaceId ?? "",
+        toType: "agent",
+        toId: agent.id,
+        relation: "contains-agent",
+      },
+      typeof workspaceId === "string" && workspaceIds.has(workspaceId),
+    );
+
+    pushEdge(
+      {
+        fromType: "auth-profile",
+        fromId: authProfileId ?? "",
+        toType: "agent",
+        toId: agent.id,
+        relation: "authenticates-agent",
+      },
+      typeof authProfileId === "string" && authProfileIds.has(authProfileId),
+    );
   }
 
   for (const session of sessions) {
-    edges.push({
-      fromType: "workspace",
-      fromId: session.workspaceId,
-      toType: "session",
-      toId: session.id,
-      relation: "contains-session",
-    });
+    const workspaceId = session.workspaceId;
+    const agentId = session.agentId;
+    const bindingId = session.bindingId;
 
-    edges.push({
-      fromType: "agent",
-      fromId: session.agentId,
-      toType: "session",
-      toId: session.id,
-      relation: "owns-session",
-    });
+    pushEdge(
+      {
+        fromType: "workspace",
+        fromId: workspaceId ?? "",
+        toType: "session",
+        toId: session.id,
+        relation: "contains-session",
+      },
+      typeof workspaceId === "string" && workspaceIds.has(workspaceId),
+    );
 
-    edges.push({
-      fromType: "binding",
-      fromId: session.bindingId,
-      toType: "session",
-      toId: session.id,
-      relation: "feeds-session",
-    });
+    pushEdge(
+      {
+        fromType: "agent",
+        fromId: agentId ?? "",
+        toType: "session",
+        toId: session.id,
+        relation: "owns-session",
+      },
+      typeof agentId === "string" && agentIds.has(agentId),
+    );
+
+    pushEdge(
+      {
+        fromType: "binding",
+        fromId: bindingId ?? "",
+        toType: "session",
+        toId: session.id,
+        relation: "feeds-session",
+      },
+      typeof bindingId === "string" && bindingIds.has(bindingId),
+    );
   }
 
   for (const binding of bindings) {
-    edges.push({
-      fromType: "workspace",
-      fromId: binding.workspaceId,
-      toType: "binding",
-      toId: binding.id,
-      relation: "contains-binding",
-    });
+    const workspaceId = binding.workspaceId;
+    const targetAgentId = binding.targetAgentId;
 
-    edges.push({
-      fromType: "binding",
-      fromId: binding.id,
-      toType: "agent",
-      toId: binding.targetAgentId,
-      relation: "targets-agent",
-    });
+    pushEdge(
+      {
+        fromType: "workspace",
+        fromId: workspaceId ?? "",
+        toType: "binding",
+        toId: binding.id,
+        relation: "contains-binding",
+      },
+      typeof workspaceId === "string" && workspaceIds.has(workspaceId),
+    );
+
+    pushEdge(
+      {
+        fromType: "binding",
+        fromId: binding.id,
+        toType: "agent",
+        toId: targetAgentId ?? "",
+        relation: "targets-agent",
+      },
+      typeof targetAgentId === "string" && agentIds.has(targetAgentId),
+    );
   }
 
   for (const authProfile of authProfiles) {
-    for (const workspaceId of authProfile.workspaceIds) {
-      edges.push({
-        fromType: "auth-profile",
-        fromId: authProfile.id,
-        toType: "workspace",
-        toId: workspaceId,
-        relation: "scoped-to-workspace",
-      });
+    for (const workspaceId of authProfile.workspaceIds ?? []) {
+      pushEdge(
+        {
+          fromType: "auth-profile",
+          fromId: authProfile.id,
+          toType: "workspace",
+          toId: workspaceId,
+          relation: "scoped-to-workspace",
+        },
+        workspaceIds.has(workspaceId),
+      );
     }
   }
 
@@ -179,10 +228,39 @@ export function buildTopologyView(input: {
   };
 }
 
-export function createResponseMeta(generatedAt: string, source: "mock" | "openclaw" | "mixed") {
+export function createCollectionMetadata(input: {
+  collection: CollectionName;
+  status?: CollectionStatus;
+  freshness?: CollectionFreshness;
+  collectedAt?: string;
+  recordCount?: number;
+  sourceIds?: string[];
+  warnings?: SnapshotWarning[];
+}): CollectionMetadata {
+  return {
+    collection: input.collection,
+    status: input.status ?? "complete",
+    freshness: input.freshness ?? "fresh",
+    ...(input.collectedAt ? { collectedAt: input.collectedAt } : {}),
+    ...(typeof input.recordCount === "number" ? { recordCount: input.recordCount } : {}),
+    ...(input.sourceIds ? { sourceIds: input.sourceIds } : {}),
+    warnings: input.warnings ?? [],
+  };
+}
+
+export function createResponseMeta(
+  generatedAt: string,
+  source: SnapshotSource,
+  options?: {
+    collections?: Partial<Record<CollectionName, CollectionMetadata>>;
+    warnings?: SnapshotWarning[];
+  },
+) {
   return {
     generatedAt,
     source,
     readOnly: true as const,
+    ...(options?.collections ? { collections: options.collections } : {}),
+    ...(options?.warnings && options.warnings.length > 0 ? { warnings: options.warnings } : {}),
   };
 }

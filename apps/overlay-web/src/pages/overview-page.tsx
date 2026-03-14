@@ -5,10 +5,12 @@ import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { formatTimestamp } from "../lib/format.js";
+import { useI18n } from "../lib/i18n.js";
 import { overlayApi } from "../lib/api.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
+  const { language, t, translateComponentType } = useI18n();
   const loadOverview = useCallback(async () => {
     const [health, summary] = await Promise.all([overlayApi.getHealth(), overlayApi.getSummary()]);
 
@@ -26,22 +28,22 @@ export function OverviewPage() {
     }
 
     return [
-      { to: "/agents", label: "Agents", count: data.summary.data.totals.agents },
-      { to: "/workspaces", label: "Workspaces", count: data.summary.data.totals.workspaces },
-      { to: "/sessions", label: "Sessions", count: data.summary.data.totals.sessions },
-      { to: "/bindings", label: "Bindings", count: data.summary.data.totals.bindings },
-      { to: "/auth-profiles", label: "Auth Profiles", count: data.summary.data.totals.authProfiles },
-      { to: "/topology", label: "Topology", count: data.summary.runtimeStatuses.length },
+      { to: "/agents", label: t("nav.agents"), count: data.summary.data.totals.agents },
+      { to: "/workspaces", label: t("nav.workspaces"), count: data.summary.data.totals.workspaces },
+      { to: "/sessions", label: t("nav.sessions"), count: data.summary.data.totals.sessions },
+      { to: "/bindings", label: t("nav.bindings"), count: data.summary.data.totals.bindings },
+      { to: "/auth-profiles", label: t("nav.authProfiles"), count: data.summary.data.totals.authProfiles },
+      { to: "/topology", label: t("nav.topology"), count: data.summary.runtimeStatuses.length },
     ];
-  }, [data]);
+  }, [data, t]);
 
   const isEmpty = !loading && !error && data?.summary.runtimeStatuses.length === 0;
 
   return (
     <section className="page fade-in-up">
       <header className="page-header">
-        <h2>Overview Dashboard</h2>
-        <p>Read-only inventory and runtime health summary for team operations.</p>
+        <h2>{t("overview.title")}</h2>
+        <p>{t("overview.description")}</p>
       </header>
 
       <DataState
@@ -49,31 +51,36 @@ export function OverviewPage() {
         error={error}
         onRetry={retry}
         isEmpty={isEmpty}
-        emptyTitle="Runtime status is currently unavailable"
-        emptyMessage="Retry to refresh the current system snapshot."
+        emptyTitle={t("overview.emptyTitle")}
+        emptyMessage={t("overview.emptyMessage")}
       >
         {data ? (
           <>
             <div className={`health-banner health-${data.health.status}`}>
               <p>
-                Overlay API health is <StatusBadge status={data.health.status} /> with {data.summary.runtimeStatuses.length} runtime components observed.
+                {t("overview.healthPrefix")} <StatusBadge status={data.health.status} />{" "}
+                {t("overview.healthSuffix", { count: data.summary.runtimeStatuses.length })}
               </p>
-              <p>Last health check: {formatTimestamp(data.health.time)}</p>
+              <p>{t("overview.lastHealthCheck", { time: formatTimestamp(data.health.time, language) })}</p>
             </div>
 
             <div className="metrics-grid">
-              <MetricCard label="Agents" value={data.summary.data.totals.agents} />
-              <MetricCard label="Workspaces" value={data.summary.data.totals.workspaces} />
-              <MetricCard label="Sessions" value={data.summary.data.totals.sessions} detail={`${data.summary.data.activeSessions} active`} />
-              <MetricCard label="Bindings" value={data.summary.data.totals.bindings} />
-              <MetricCard label="Auth Profiles" value={data.summary.data.totals.authProfiles} />
-              <MetricCard label="Snapshot Time" value={formatTimestamp(data.summary.meta.generatedAt)} />
+              <MetricCard label={t("overview.metric.agents")} value={data.summary.data.totals.agents} />
+              <MetricCard label={t("overview.metric.workspaces")} value={data.summary.data.totals.workspaces} />
+              <MetricCard
+                label={t("overview.metric.sessions")}
+                value={data.summary.data.totals.sessions}
+                detail={t("common.activeCount", { count: data.summary.data.activeSessions })}
+              />
+              <MetricCard label={t("overview.metric.bindings")} value={data.summary.data.totals.bindings} />
+              <MetricCard label={t("overview.metric.authProfiles")} value={data.summary.data.totals.authProfiles} />
+              <MetricCard label={t("overview.metric.snapshotTime")} value={formatTimestamp(data.summary.meta.generatedAt, language)} />
             </div>
 
             <div className="panel">
               <div className="panel-header">
-                <h3>Drill-down Paths</h3>
-                <p>Navigate directly to inventory views</p>
+                <h3>{t("overview.drilldownTitle")}</h3>
+                <p>{t("overview.drilldownDescription")}</p>
               </div>
 
               <div className="drilldown-grid">
@@ -88,30 +95,30 @@ export function OverviewPage() {
 
             <div className="panel">
               <div className="panel-header">
-                <h3>Runtime Status</h3>
-                <p>Snapshot generated {formatTimestamp(data.summary.meta.generatedAt)}</p>
+                <h3>{t("overview.runtimeStatusTitle")}</h3>
+                <p>{t("common.generatedAt", { time: formatTimestamp(data.summary.meta.generatedAt, language) })}</p>
               </div>
 
               <div className="table-wrap">
                 <table className="data-table density-comfortable">
                   <thead>
                     <tr>
-                      <th>Component</th>
-                      <th>Type</th>
-                      <th>Status</th>
-                      <th>Observed</th>
-                      <th>Details</th>
+                      <th>{t("overview.table.component")}</th>
+                      <th>{t("overview.table.type")}</th>
+                      <th>{t("overview.table.status")}</th>
+                      <th>{t("overview.table.observed")}</th>
+                      <th>{t("overview.table.details")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.summary.runtimeStatuses.map((runtimeStatus) => (
                       <tr key={runtimeStatus.componentId}>
                         <td className="cell-mono">{runtimeStatus.componentId}</td>
-                        <td>{runtimeStatus.componentType}</td>
+                        <td>{translateComponentType(runtimeStatus.componentType)}</td>
                         <td>
                           <StatusBadge status={runtimeStatus.status} />
                         </td>
-                        <td>{formatTimestamp(runtimeStatus.observedAt)}</td>
+                        <td>{formatTimestamp(runtimeStatus.observedAt, language)}</td>
                         <td>
                           {Object.entries(runtimeStatus.details)
                             .map(([key, value]) => `${key}: ${String(value)}`)

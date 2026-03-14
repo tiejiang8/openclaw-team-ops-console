@@ -3,6 +3,10 @@ node_modules
 dist
 coverage
 *.log
+.env
+.env.local
+.env.*.local
 .DS_Store
 apps/overlay-web/.vite
 apps/overlay-web/dist
+.github/.DS_Store

@@ -1,4 +1,15 @@
-import type { Agent, AuthProfile, BindingRoute, InventorySummary, RuntimeStatus, Session, SystemSnapshot, TopologyView, Workspace } from "@openclaw-team-ops/shared";
+import type {
+  Agent,
+  AuthProfile,
+  BindingRoute,
+  InventorySummary,
+  RuntimeStatus,
+  Session,
+  SystemSnapshot,
+  TopologyView,
+  Workspace,
+  WorkspaceDocument,
+} from "@openclaw-team-ops/shared";
 
 import type { SidecarInventoryAdapter } from "../adapters/source-adapter.js";
 
@@ -19,6 +30,10 @@ export class SidecarService {
 
   async getWorkspaces(): Promise<Workspace[]> {
     return (await this.getSnapshot()).workspaces;
+  }
+
+  async getWorkspaceDocument(workspaceId: string, fileName: string): Promise<WorkspaceDocument | undefined> {
+    return this.adapter.getWorkspaceDocument(workspaceId, fileName);
   }
 
   async getSessions(): Promise<Session[]> {

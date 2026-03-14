@@ -9,12 +9,20 @@
   },
   "scripts": {
     "dev": "corepack pnpm --filter @openclaw-team-ops/shared build && concurrently -k -n SIDECAR,API,WEB -c cyan,green,magenta \"corepack pnpm --filter @openclaw-team-ops/sidecar dev\" \"corepack pnpm --filter @openclaw-team-ops/overlay-api dev\" \"corepack pnpm --filter @openclaw-team-ops/overlay-web dev\"",
+    "dev:reset": "node scripts/clean-generated.mjs",
     "build": "corepack pnpm -r build",
-    "typecheck": "corepack pnpm --filter @openclaw-team-ops/shared build && corepack pnpm -r typecheck"
+    "typecheck": "corepack pnpm --filter @openclaw-team-ops/shared build && corepack pnpm -r typecheck",
+    "test": "corepack pnpm --filter @openclaw-team-ops/shared build && node --import tsx --test test/**/*.test.ts",
+    "guard:readonly": "node scripts/guard-readonly.mjs",
+    "check": "corepack pnpm guard:readonly && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down --remove-orphans",
+    "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "concurrently": "^9.1.2",
+    "tsx": "^4.20.5",
     "typescript": "^5.8.2"
   }
 }
