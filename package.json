@@ -1,0 +1,20 @@
+{
+  "name": "openclaw-team-ops-console",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw Team Ops Console - OpenClaw Multi-Agent Control",
+  "packageManager": "pnpm@10.6.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --filter @openclaw-team-ops/shared build && concurrently -k -n SIDECAR,API,WEB -c cyan,green,magenta \"corepack pnpm --filter @openclaw-team-ops/sidecar dev\" \"corepack pnpm --filter @openclaw-team-ops/overlay-api dev\" \"corepack pnpm --filter @openclaw-team-ops/overlay-web dev\"",
+    "build": "corepack pnpm -r build",
+    "typecheck": "corepack pnpm --filter @openclaw-team-ops/shared build && corepack pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  }
+}
