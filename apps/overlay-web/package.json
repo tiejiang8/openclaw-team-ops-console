@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "OpenClaw Team Ops Overlay Web - governance and visibility UI",
   "scripts": {
     "dev": "vite",
     "build": "corepack pnpm --filter @openclaw-team-ops/shared build && tsc -p tsconfig.json && vite build",

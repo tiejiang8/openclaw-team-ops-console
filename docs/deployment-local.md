@@ -1,8 +1,8 @@
 # Local Deployment
 
-This document covers the supported local startup paths for the v0.1 alpha package.
+This document covers supported local startup paths for the current governance preview.
 
-## Supported Modes
+## Supported modes
 
 ### 1. Process mode
 
@@ -16,7 +16,7 @@ Runs the three applications directly from this repository:
 
 Runs the same architecture with Docker Compose in default mock mode.
 
-## Environment Setup
+## Environment setup
 
 Create a local env file if you want to override defaults:
 
@@ -24,10 +24,9 @@ Create a local env file if you want to override defaults:
 cp .env.example .env
 ```
 
-Default behavior is already suitable for local evaluation.
-Mock mode remains the default when no `OPENCLAW_*` runtime paths are configured.
+Default behavior is suitable for local evaluation. Mock mode remains the default unless local runtime paths or a target registry file are configured.
 
-## Process-mode Startup
+## Process-mode startup
 
 Install:
 
@@ -41,7 +40,7 @@ Start:
 corepack pnpm dev
 ```
 
-URLs:
+Default URLs:
 
 - Overlay Web: `http://localhost:5173`
 - Overlay API: `http://localhost:4300`
@@ -51,18 +50,17 @@ URLs:
 
 - overlay-web uses same-origin `/api` and `/health` routing by default
 - Vite proxies those requests to overlay-api during local development
-- sidecar logs the active mock scenario on startup
+- sidecar remains read-only and prints its adapter state on startup
 
-## Optional Local OpenClaw Path Mode
+## Optional local OpenClaw path mode
 
-Phase 1.4 adds a read-only filesystem adapter for local OpenClaw runtime inspection.
-
-Use it when you want this standalone console to read documented OpenClaw files from the same machine without importing OpenClaw code.
+Use the filesystem adapter when you want this standalone console to read documented OpenClaw files from the same machine without importing OpenClaw code.
 
 Typical startup:
 
 ```bash
-OPENCLAW_RUNTIME_ROOT=~/.openclaw \
+OPENCLAW_STATE_DIR=~/.openclaw \
+OPENCLAW_CONFIG_PATH=~/.openclaw/openclaw.json \
 OPENCLAW_WORKSPACE_GLOB='~/.openclaw/workspace*' \
 OPENCLAW_SOURCE_ROOT=~/openclaw \
 corepack pnpm dev
@@ -70,27 +68,40 @@ corepack pnpm dev
 
 Behavior:
 
-- `OPENCLAW_CONFIG_FILE` is optional; when omitted and `OPENCLAW_RUNTIME_ROOT` is set, sidecar reads `${OPENCLAW_RUNTIME_ROOT}/openclaw.json`
+- filesystem mode activates when any of `OPENCLAW_RUNTIME_ROOT`, `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_FILE`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_WORKSPACE_GLOB`, or `OPENCLAW_PROFILE` is set
+- `OPENCLAW_CONFIG_FILE` / `OPENCLAW_CONFIG_PATH` are optional; when both are omitted, sidecar resolves the config path from the state dir using the same candidate order as OpenClaw
+- `OPENCLAW_RUNTIME_ROOT` is a sidecar alias for `OPENCLAW_STATE_DIR`
+- `OPENCLAW_CONFIG_FILE` is a sidecar alias for `OPENCLAW_CONFIG_PATH`
+- `OPENCLAW_PROFILE` can derive the default state dir and default main-agent workspace even when no explicit paths are set
 - missing paths do not switch back to mock mode; they surface as warnings and `partial` or `unavailable` collections
 - `OPENCLAW_SOURCE_ROOT` is informational only and does not activate filesystem mode by itself
 
-Supported files and path details are documented in `docs/local-path-integration.md`.
+## Optional target registry mode
 
-## Container Startup
+Use `SIDECAR_TARGETS_FILE` to register multiple targets in one console instance.
 
-The provided Compose setup does not mount an OpenClaw runtime directory by default. Local path-based integration is currently documented for process mode.
+Example:
+
+```bash
+SIDECAR_TARGETS_FILE=./examples/targets.registry.example.json \
+corepack pnpm dev
+```
+
+Target registry notes:
+
+- each target can use either `mock` or `filesystem`
+- all collection remains read-only
+- target metadata flows through the existing `Target` and governance contracts
+
+## Container startup
+
+The provided Compose setup remains mock-first by default and does not mount an OpenClaw runtime directory automatically.
 
 Start:
 
 ```bash
 docker compose up --build
 ```
-
-URLs:
-
-- Overlay Web: `http://localhost:5173`
-- Overlay API: `http://localhost:4300`
-- Sidecar: `http://localhost:4310`
 
 Stop:
 
@@ -112,23 +123,7 @@ Compose includes healthchecks for:
 - overlay-api: `GET /health`
 - overlay-web: `GET /ready`
 
-These healthchecks are intended for local operator confidence and compose dependency ordering.
-
-## Mock Scenarios
-
-Recommended scenarios for local review:
-
-- `baseline`
-- `partial-coverage`
-- `stale-observability`
-
-Example:
-
-```bash
-SIDECAR_MOCK_SCENARIO=partial-coverage docker compose up --build
-```
-
-## Quality Verification
+## Quality verification
 
 ```bash
 corepack pnpm guard:readonly
@@ -137,19 +132,10 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-## Safe Reset
+## Safe reset
 
 To clear generated artifacts without touching source files:
 
 ```bash
 corepack pnpm dev:reset
 ```
-
-## Boundary Reminder
-
-This repo remains:
-
-- standalone
-- mock-first by default
-- read-only
-- independent of any OpenClaw core patch or source import

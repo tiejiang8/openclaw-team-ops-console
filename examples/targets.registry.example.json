@@ -1,0 +1,19 @@
+[
+  {
+    "id": "mock-baseline",
+    "name": "Mock Baseline",
+    "environment": "sandbox",
+    "owner": "team-ops",
+    "mockScenario": "baseline"
+  },
+  {
+    "id": "local-runtime-dev",
+    "name": "Local Runtime Dev",
+    "environment": "development",
+    "owner": "team-ops",
+    "runtimeRoot": "/home/your-user/.openclaw",
+    "configFile": "/home/your-user/.openclaw/openclaw.json",
+    "workspaceGlob": "/home/your-user/.openclaw/workspace*",
+    "sourceRoot": "/home/your-user/code/openclaw"
+  }
+]

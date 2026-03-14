@@ -1,0 +1,43 @@
+{
+  "data": {
+    "generatedAt": "2026-03-14T10:20:00.000Z",
+    "openFindings": 6,
+    "bySeverity": {
+      "critical": 1,
+      "high": 2,
+      "medium": 2,
+      "low": 1
+    },
+    "byType": {
+      "config-include-anomaly": 2,
+      "workspace-drift": 1,
+      "dangling-binding": 1,
+      "orphan-session": 1,
+      "snapshot-freshness-degradation": 1
+    },
+    "staleTargets": 1,
+    "coverageGaps": 3,
+    "highestRiskScore": 90,
+    "targetBreakdown": [
+      {
+        "targetId": "local-runtime-dev",
+        "targetName": "Local Runtime Dev",
+        "openFindings": 4,
+        "highestScore": 90,
+        "highestSeverity": "critical"
+      },
+      {
+        "targetId": "mock-baseline",
+        "targetName": "Mock Baseline",
+        "openFindings": 2,
+        "highestScore": 50,
+        "highestSeverity": "medium"
+      }
+    ]
+  },
+  "meta": {
+    "generatedAt": "2026-03-14T10:20:00.000Z",
+    "source": "mixed",
+    "readOnly": true
+  }
+}

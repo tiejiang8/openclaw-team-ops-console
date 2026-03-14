@@ -5,6 +5,9 @@ import type {
   BindingsResponse,
   HealthResponse,
   SummaryResponse,
+  TargetResponse,
+  TargetsResponse,
+  TargetSummaryResponse,
   TopologyResponse,
   WorkspaceDocumentResponse,
   WorkspacesResponse,
@@ -31,6 +34,38 @@ export class SidecarClient {
 
   async getSummary(): Promise<SummaryResponse> {
     return this.request<SummaryResponse>("/sidecar/summary");
+  }
+
+  async getTargets(): Promise<TargetsResponse> {
+    return this.request<TargetsResponse>("/sidecar/targets");
+  }
+
+  async getTargetById(id: string): Promise<TargetResponse | undefined> {
+    const response = await this.fetch(`/sidecar/targets/${encodeURIComponent(id)}`);
+
+    if (response.status === 404) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Sidecar returned ${response.status} for target ${id}`);
+    }
+
+    return (await response.json()) as TargetResponse;
+  }
+
+  async getTargetSummary(id: string): Promise<TargetSummaryResponse | undefined> {
+    const response = await this.fetch(`/sidecar/targets/${encodeURIComponent(id)}/summary`);
+
+    if (response.status === 404) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Sidecar returned ${response.status} for target summary ${id}`);
+    }
+
+    return (await response.json()) as TargetSummaryResponse;
   }
 
   async getAgents(): Promise<AgentsResponse> {

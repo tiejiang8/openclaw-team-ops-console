@@ -1,102 +1,148 @@
-# API Contract (v0.1)
+# API Contract (v0.2 governance preview)
 
-Primary contract is implemented in `apps/overlay-api` and typed in `packages/shared/src/contracts.ts`.
+Primary contracts are typed in `packages/shared/src/contracts.ts` and implemented by `apps/overlay-api`.
+
+## Global guarantees
+
+- GET-only API surface
+- `x-openclaw-ops-readonly: true` on responses
+- `meta.readOnly = true`
+- degraded and partial data remain explicit through collection metadata and warnings
 
 ## Health
 
 ### `GET /health`
 
-Returns overlay-api health and sidecar dependency health.
+Returns overlay-api health plus sidecar dependency status.
 
-## Inventory Summary
+## Summary and inventory
 
 ### `GET /api/summary`
-
-Returns:
-
-- `InventorySummary` (`data`)
-- `runtimeStatuses`
-- read-only `meta`
-- `meta.collections` with per-collection freshness, status, and counts
-- `meta.warnings` when the snapshot is partial, stale, or otherwise degraded
-
-## Agents
+Returns `SummaryResponse`.
 
 ### `GET /api/agents`
-
-Returns `ListResponse<Agent>`.
-
 ### `GET /api/agents/:id`
-
-Returns `ItemResponse<Agent>`, or `404` with `ErrorResponse`.
-
-## Workspaces
-
 ### `GET /api/workspaces`
-
-Returns `ListResponse<Workspace>`.
-
-## Sessions
-
+### `GET /api/workspaces/:id/documents/:fileName`
 ### `GET /api/sessions`
-
-Returns `ListResponse<Session>`.
-
-## Bindings
-
 ### `GET /api/bindings`
-
-Returns `ListResponse<BindingRoute>`.
-
-## Auth Profiles
-
 ### `GET /api/auth-profiles`
-
-Returns `ListResponse<AuthProfile>`.
-
-## Topology
-
 ### `GET /api/topology`
-
-Returns `TopologyResponse` containing nodes and relationship edges.
-
-## Runtime Status
-
 ### `GET /api/runtime-status`
 
-Returns runtime status list aggregated from sidecar and overlay-api process context.
+These remain the original read-only inventory contracts.
 
-## Response Meta
+## Targets
 
-Most successful payloads include:
+### `GET /api/targets`
+Returns `TargetsResponse`.
 
-- `meta.generatedAt`
-- `meta.source` (`mock`, `openclaw`, or `mixed`)
-- `meta.readOnly = true`
-- optional `meta.collections`
-- optional `meta.warnings`
+### `GET /api/targets/:id`
+Returns `TargetResponse` or `404 TARGET_NOT_FOUND`.
 
-List endpoints expose collection-level metadata for their primary collection. Summary responses can expose metadata for all collections carried by the snapshot.
+### `GET /api/targets/:id/summary`
+Returns `TargetSummaryResponse` or `404 TARGET_NOT_FOUND`.
 
-## Degraded-mode Contract
+`TargetSummaryResponse` now carries target-scoped inventory arrays plus collection metadata, warnings, and runtime statuses.
 
-Phase 1.2 hardens the API contract for future real adapters:
+## Evidence
 
-- entity records may omit non-identity fields that are unavailable from an external source
-- collection metadata distinguishes `complete`, `partial`, and `unavailable` coverage
-- freshness distinguishes `fresh`, `stale`, and `unknown`
-- topology edges are omitted instead of emitting broken references when upstream identifiers are missing
-- sidecar and overlay-api still return read-only responses in degraded and failure cases
+### `GET /api/evidence`
+Returns `EvidencesResponse`.
 
-## Error Responses
+Supported filters:
 
-Read failures still preserve the read-only contract:
+- `targetId`
+- `severity`
+- `kind`
+- `subjectType`
+- `subjectId`
 
-- sidecar returns `ADAPTER_UNAVAILABLE`
-- overlay-api returns `UPSTREAM_UNAVAILABLE`
+### `GET /api/evidence/:id`
+Returns `EvidenceResponse` or `404 EVIDENCE_NOT_FOUND`.
 
-## v0.1 Guarantees
+## Findings
 
-- GET-only API surface
-- no mutation routes
-- no write-through behavior to OpenClaw systems
+### `GET /api/findings`
+Returns `FindingsResponse`.
+
+Supported filters:
+
+- `targetId`
+- `severity`
+- `type`
+- `status`
+
+### `GET /api/findings/:id`
+Returns `FindingResponse` or `404 FINDING_NOT_FOUND`.
+
+## Recommendations
+
+### `GET /api/recommendations`
+Returns `RecommendationsResponse`.
+
+Supported filters:
+
+- `findingId`
+
+### `GET /api/recommendations/:id`
+Returns `RecommendationResponse` or `404 RECOMMENDATION_NOT_FOUND`.
+
+## Risks summary
+
+### `GET /api/risks/summary`
+Returns `RisksSummaryResponse`.
+
+This summary aggregates:
+
+- open findings
+- severity breakdown
+- finding type breakdown
+- stale target count
+- coverage gap count
+- highest risk score
+- target-level risk breakdown
+
+## Standardized governance concepts
+
+### `Evidence`
+Maps read-only facts such as:
+
+- snapshot warnings
+- partial or unavailable collections
+- stale freshness signals
+- workspace drift indicators
+- config include anomalies
+- runtime degradation
+
+### `Finding`
+Represents operator-facing conclusions with:
+
+- severity
+- summary
+- target and subject references
+- evidence references
+- recommendation references
+- score
+
+### `Recommendation`
+Represents read-only suggested checks with:
+
+- priority
+- requiresHuman
+- optional `commandTemplate`
+- optional `pathHint`
+- optional `docLink`
+- optional `safetyLevel`
+
+Recommendations do not execute anything.
+
+## Example payloads
+
+See:
+
+- [docs/v0.2-api-examples.md](v0.2-api-examples.md)
+- [docs/examples/api/targets.json](examples/api/targets.json)
+- [docs/examples/api/findings.json](examples/api/findings.json)
+- [docs/examples/api/evidence.json](examples/api/evidence.json)
+- [docs/examples/api/risks-summary.json](examples/api/risks-summary.json)

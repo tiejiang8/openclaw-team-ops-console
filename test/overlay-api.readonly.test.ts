@@ -2,7 +2,21 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 
-import type { ErrorResponse, SummaryResponse, WorkspaceDocumentResponse, WorkspacesResponse } from "@openclaw-team-ops/shared";
+import type {
+  EvidenceResponse,
+  EvidencesResponse,
+  ErrorResponse,
+  FindingResponse,
+  FindingsResponse,
+  RecommendationsResponse,
+  RisksSummaryResponse,
+  SummaryResponse,
+  TargetResponse,
+  TargetSummaryResponse,
+  TargetsResponse,
+  WorkspaceDocumentResponse,
+  WorkspacesResponse,
+} from "@openclaw-team-ops/shared";
 import type { Express } from "express";
 
 import { createOverlayApiApp } from "../apps/overlay-api/src/app.js";
@@ -72,6 +86,101 @@ test("overlay api summary remains read-only and includes collection metadata", a
     assert.equal(body.meta.collections?.agents?.status, "complete");
     assert.equal(body.meta.collections?.runtimeStatuses?.recordCount, body.runtimeStatuses.length);
     assert.ok(body.runtimeStatuses.some((status) => status.componentId === "overlay-api"));
+  });
+});
+
+test("overlay api exposes a read-only target registry and target summary", async () => {
+  await withApiStack("baseline", async (apiBaseUrl) => {
+    const targetsResponse = await fetch(`${apiBaseUrl}/api/targets`);
+    const targetsBody = (await targetsResponse.json()) as TargetsResponse;
+    const target = targetsBody.data[0];
+
+    assert.equal(targetsResponse.status, 200);
+    assert.equal(targetsResponse.headers.get("x-openclaw-ops-readonly"), "true");
+    assert.equal(targetsBody.meta.readOnly, true);
+    assert.ok(target);
+    assert.equal(target.sourceKind, "mock");
+    assert.equal(target.collectionPolicy.readOnly, true);
+
+    const targetResponse = await fetch(`${apiBaseUrl}/api/targets/${encodeURIComponent(target.id)}`);
+    const targetBody = (await targetResponse.json()) as TargetResponse;
+
+    assert.equal(targetResponse.status, 200);
+    assert.equal(targetBody.data.id, target.id);
+    assert.equal(targetBody.data.name, target.name);
+
+    const targetSummaryResponse = await fetch(`${apiBaseUrl}/api/targets/${encodeURIComponent(target.id)}/summary`);
+    const targetSummaryBody = (await targetSummaryResponse.json()) as TargetSummaryResponse;
+
+    assert.equal(targetSummaryResponse.status, 200);
+    assert.equal(targetSummaryBody.meta.readOnly, true);
+    assert.equal(targetSummaryBody.data.target.id, target.id);
+    assert.ok(targetSummaryBody.data.summary.totals.agents > 0);
+    assert.ok(targetSummaryBody.data.runtimeStatuses.length > 0);
+  });
+});
+
+test("overlay api returns 404 for unknown targets without creating write paths", async () => {
+  await withApiStack("baseline", async (apiBaseUrl) => {
+    const response = await fetch(`${apiBaseUrl}/api/targets/does-not-exist`);
+    const body = (await response.json()) as ErrorResponse;
+
+    assert.equal(response.status, 404);
+    assert.equal(response.headers.get("x-openclaw-ops-readonly"), "true");
+    assert.equal(body.meta.readOnly, true);
+    assert.equal(body.error.code, "TARGET_NOT_FOUND");
+  });
+});
+
+test("overlay api exposes read-only evidence, findings, risks, and recommendations", async () => {
+  await withApiStack("partial-coverage", async (apiBaseUrl) => {
+    const risksResponse = await fetch(`${apiBaseUrl}/api/risks/summary`);
+    const risksBody = (await risksResponse.json()) as RisksSummaryResponse;
+
+    assert.equal(risksResponse.status, 200);
+    assert.equal(risksBody.meta.readOnly, true);
+    assert.ok(risksBody.data.openFindings > 0);
+    assert.ok(risksBody.data.targetBreakdown.length > 0);
+
+    const evidenceResponse = await fetch(`${apiBaseUrl}/api/evidence?severity=warn`);
+    const evidenceBody = (await evidenceResponse.json()) as EvidencesResponse;
+
+    assert.equal(evidenceResponse.status, 200);
+    assert.equal(evidenceBody.meta.readOnly, true);
+    assert.ok(evidenceBody.data.length > 0);
+    assert.ok(evidenceBody.data.some((evidence) => evidence.kind === "coverage-gap"));
+
+    const findingListResponse = await fetch(`${apiBaseUrl}/api/findings?type=dangling-binding`);
+    const findingListBody = (await findingListResponse.json()) as FindingsResponse;
+    const finding = findingListBody.data[0];
+
+    assert.equal(findingListResponse.status, 200);
+    assert.ok(finding);
+    assert.ok(finding.evidenceRefs.length > 0);
+    assert.equal(finding.type, "dangling-binding");
+
+    const findingResponse = await fetch(`${apiBaseUrl}/api/findings/${encodeURIComponent(finding.id)}`);
+    const findingBody = (await findingResponse.json()) as FindingResponse;
+
+    assert.equal(findingResponse.status, 200);
+    assert.equal(findingBody.data.id, finding.id);
+
+    const recommendationResponse = await fetch(
+      `${apiBaseUrl}/api/recommendations?findingId=${encodeURIComponent(finding.id)}`,
+    );
+    const recommendationBody = (await recommendationResponse.json()) as RecommendationsResponse;
+
+    assert.equal(recommendationResponse.status, 200);
+    assert.ok(recommendationBody.data.length >= 1);
+    assert.ok(recommendationBody.data.every((recommendation) => recommendation.findingId === finding.id));
+
+    const evidenceDetailResponse = await fetch(
+      `${apiBaseUrl}/api/evidence/${encodeURIComponent(finding.evidenceRefs[0]!)}`,
+    );
+    const evidenceDetailBody = (await evidenceDetailResponse.json()) as EvidenceResponse;
+
+    assert.equal(evidenceDetailResponse.status, 200);
+    assert.equal(evidenceDetailBody.data.id, finding.evidenceRefs[0]);
   });
 });
 
@@ -166,6 +275,87 @@ test("overlay api forwards filesystem-adapter snapshots through the read-only co
     assert.equal(body.meta.collections?.workspaces?.status, "partial");
     assert.ok(body.meta.warnings?.some((warning) => warning.code === "OPENCLAW_WORKSPACE_DIRECTORY_MISSING"));
     assert.ok(body.runtimeStatuses.some((status) => status.componentId === "openclaw-config-file"));
+  } finally {
+    await api.close();
+    await sidecar.close();
+    await fixture.cleanup();
+  }
+});
+
+test("overlay api exposes filesystem-backed targets through the same read-only target contract", async () => {
+  const fixture = await createFilesystemRuntimeFixture();
+  const sidecar = await startServer(
+    createSidecarApp(
+      new FilesystemOpenClawAdapter({
+        runtimeRoot: fixture.runtimeRoot,
+        configFile: fixture.configFile,
+        workspaceGlob: fixture.workspaceGlob,
+        sourceRoot: fixture.sourceRoot,
+      }),
+    ),
+  );
+  const api = await startServer(
+    createOverlayApiApp(
+      new SidecarClient({
+        baseUrl: sidecar.url,
+        timeoutMs: 5000,
+      }),
+    ),
+  );
+
+  try {
+    const targetsResponse = await fetch(`${api.url}/api/targets`);
+    const targetsBody = (await targetsResponse.json()) as TargetsResponse;
+    const target = targetsBody.data[0];
+
+    assert.equal(targetsResponse.status, 200);
+    assert.ok(target);
+    assert.equal(target.sourceKind, "filesystem");
+    assert.equal(target.collectionPolicy.readOnly, true);
+    assert.equal(target.connection.runtimeRoot, fixture.runtimeRoot);
+
+    const summaryResponse = await fetch(`${api.url}/api/targets/${encodeURIComponent(target.id)}/summary`);
+    const summaryBody = (await summaryResponse.json()) as TargetSummaryResponse;
+
+    assert.equal(summaryResponse.status, 200);
+    assert.equal(summaryBody.data.target.id, target.id);
+    assert.equal(summaryBody.data.collections.workspaces.status, "partial");
+    assert.ok(summaryBody.data.warnings.some((warning) => warning.code === "OPENCLAW_WORKSPACE_DIRECTORY_MISSING"));
+  } finally {
+    await api.close();
+    await sidecar.close();
+    await fixture.cleanup();
+  }
+});
+
+test("overlay api surfaces config include anomalies as findings when filesystem config is unavailable", async () => {
+  const fixture = await createFilesystemRuntimeFixture();
+  const sidecar = await startServer(
+    createSidecarApp(
+      new FilesystemOpenClawAdapter({
+        runtimeRoot: fixture.runtimeRoot,
+        configFile: `${fixture.runtimeRoot}/missing-openclaw.json`,
+        workspaceGlob: fixture.workspaceGlob,
+        sourceRoot: fixture.sourceRoot,
+      }),
+    ),
+  );
+  const api = await startServer(
+    createOverlayApiApp(
+      new SidecarClient({
+        baseUrl: sidecar.url,
+        timeoutMs: 5000,
+      }),
+    ),
+  );
+
+  try {
+    const response = await fetch(`${api.url}/api/findings?type=config-include-anomaly`);
+    const body = (await response.json()) as FindingsResponse;
+
+    assert.equal(response.status, 200);
+    assert.ok(body.data.length > 0);
+    assert.ok(body.data.every((finding) => finding.type === "config-include-anomaly"));
   } finally {
     await api.close();
     await sidecar.close();

@@ -2,7 +2,7 @@
   "name": "openclaw-team-ops-console",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenClaw Team Ops Console - OpenClaw Multi-Agent Control",
+  "description": "OpenClaw Team Ops Console - Read-only governance and visibility for OpenClaw runtimes",
   "packageManager": "pnpm@10.6.4",
   "engines": {
     "node": ">=22"
@@ -13,8 +13,10 @@
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm --filter @openclaw-team-ops/shared build && corepack pnpm -r typecheck",
     "test": "corepack pnpm --filter @openclaw-team-ops/shared build && node --import tsx --test test/**/*.test.ts",
+    "test:e2e": "node scripts/prepare-playwright-linux-libs.mjs && node scripts/build-e2e-web.mjs && node --import tsx --test test/**/*.e2e.ts",
+    "playwright:install": "playwright install chromium && node scripts/prepare-playwright-linux-libs.mjs",
     "guard:readonly": "node scripts/guard-readonly.mjs",
-    "check": "corepack pnpm guard:readonly && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
+    "check": "corepack pnpm guard:readonly && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build && corepack pnpm test:e2e",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down --remove-orphans",
     "docker:logs": "docker compose logs -f"
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.13.10",
     "concurrently": "^9.1.2",
+    "playwright": "^1.52.0",
     "tsx": "^4.20.5",
     "typescript": "^5.8.2"
   }

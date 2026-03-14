@@ -7,6 +7,14 @@ const app = createSidecarApp(adapter);
 
 app.listen(port, () => {
   console.log(`[sidecar] listening on http://localhost:${port}`);
+  if (process.env.SIDECAR_TARGETS_FILE) {
+    console.log(`[sidecar] targetsFile=${process.env.SIDECAR_TARGETS_FILE}`);
+  } else if (process.env.SIDECAR_TARGET_ID || process.env.SIDECAR_TARGET_NAME) {
+    console.log(
+      `[sidecar] targetId=${process.env.SIDECAR_TARGET_ID ?? "(derived)"} targetName=${process.env.SIDECAR_TARGET_NAME ?? "(derived)"}`,
+    );
+  }
+
   if (adapter.mode === "mock") {
     console.log(
       `[sidecar] mode=read-only source=mock scenario=${process.env.SIDECAR_MOCK_SCENARIO ?? "baseline"}`,
@@ -16,6 +24,6 @@ app.listen(port, () => {
 
   console.log("[sidecar] mode=read-only source=openclaw adapter=filesystem");
   console.log(
-    `[sidecar] runtimeRoot=${process.env.OPENCLAW_RUNTIME_ROOT ?? "(derived or unset)"} configFile=${process.env.OPENCLAW_CONFIG_FILE ?? "(derived or unset)"} workspaceGlob=${process.env.OPENCLAW_WORKSPACE_GLOB ?? "(unset)"}`,
+    `[sidecar] runtimeRoot=${process.env.OPENCLAW_RUNTIME_ROOT ?? process.env.OPENCLAW_STATE_DIR ?? "(derived or unset)"} configFile=${process.env.OPENCLAW_CONFIG_FILE ?? process.env.OPENCLAW_CONFIG_PATH ?? "(derived or unset)"} workspaceGlob=${process.env.OPENCLAW_WORKSPACE_GLOB ?? "(derived official default)"} profile=${process.env.OPENCLAW_PROFILE ?? "(default)"}`,
   );
 });

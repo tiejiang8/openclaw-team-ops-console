@@ -1,0 +1,42 @@
+{
+  "data": [
+    {
+      "id": "finding-01",
+      "type": "config-include-anomaly",
+      "severity": "high",
+      "status": "open",
+      "summary": "Target local-runtime-dev has an include anomaly in the runtime config.",
+      "targetId": "local-runtime-dev",
+      "targetName": "Local Runtime Dev",
+      "subjectType": "target",
+      "subjectId": "local-runtime-dev",
+      "subjectLabel": "Local Runtime Dev",
+      "evidenceRefs": ["ev-include-01"],
+      "recommendationIds": ["rec-include-01", "rec-include-02"],
+      "observedAt": "2026-03-14T10:19:40.000Z",
+      "score": 70
+    },
+    {
+      "id": "finding-02",
+      "type": "workspace-drift",
+      "severity": "medium",
+      "status": "open",
+      "summary": "Workspace workspace-marketing is missing expected bootstrap files.",
+      "targetId": "local-runtime-dev",
+      "targetName": "Local Runtime Dev",
+      "subjectType": "workspace",
+      "subjectId": "workspace-marketing",
+      "subjectLabel": "workspace-marketing",
+      "evidenceRefs": ["ev-workspace-01", "ev-workspace-02"],
+      "recommendationIds": ["rec-workspace-01"],
+      "observedAt": "2026-03-14T10:19:42.000Z",
+      "score": 50
+    }
+  ],
+  "meta": {
+    "generatedAt": "2026-03-14T10:20:00.000Z",
+    "source": "mixed",
+    "readOnly": true,
+    "count": 2
+  }
+}

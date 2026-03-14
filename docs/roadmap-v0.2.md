@@ -1,46 +1,78 @@
 # Roadmap v0.2
 
-## Objective
+## Current status
 
-Expand from mock-backed visibility to real-source operational visibility while preserving sidecar boundaries and read-focused contracts.
+The repository now has the core v0.2 governance spine in place:
 
-## Planned Workstreams
+- `Target Registry`
+- `Evidence`
+- `Findings`
+- `Risks Summary`
+- `Recommendations`
+- governance pages in `overlay-web`
 
-### 1) Real Adapter Implementations
+## Delivered in the current implementation
 
-- add adapter(s) that read from externally exposed OpenClaw sources
-- retain mock adapter for offline demo/dev mode
-- add adapter selection configuration (`mock`, `openclaw`, hybrid fallback)
+### 1) Governance model
 
-### 2) Enhanced Observability
+- `Target` domain model
+- target-scoped summary contract
+- explicit `Evidence`, `Finding`, `Recommendation`, and `RisksSummary` models
 
-- lightweight periodic refresh and snapshot diffing
-- trend panels for inventory deltas
-- warning surfacing for stale heartbeats and expiring auth profiles
+### 2) Governance API
 
-### 3) Reliability
+- `GET /api/targets`
+- `GET /api/targets/:id`
+- `GET /api/targets/:id/summary`
+- `GET /api/evidence`
+- `GET /api/evidence/:id`
+- `GET /api/findings`
+- `GET /api/findings/:id`
+- `GET /api/recommendations`
+- `GET /api/recommendations/:id`
+- `GET /api/risks/summary`
 
-- retries/timeouts/circuit patterns between overlay-api and sidecar
-- adapter health diagnostics with richer reason codes
-- graceful degradation in UI when subsets are unavailable
+### 3) Governance UI
 
-### 4) API Contract Hardening
+- `Targets`
+- `Target Detail`
+- `Risks`
+- `Findings`
+- `Finding Detail`
+- `Evidence`
+- `Evidence Detail`
 
-- pagination and query filters for large inventories
-- versioned API namespace strategy (`/api/v1`)
-- schema validation and contract tests
+### 4) Multi-target readiness
 
-### 5) UI Improvements for Team Ops
+- `SIDECAR_TARGETS_FILE` support
+- mixed `mock` and `filesystem` targets in one console instance
+- target-level source metadata, coverage, warning count, and risk score
 
-- saved filters for operations teams
-- deep-linking to entities from topology edges
-- denser tables for high-scale inventories
+## Remaining work before a full v0.2 release recommendation
 
-## Deferred (still not default v0.2)
+### 1) Review artifacts
 
-- mutating controls
+- capture screenshots for governance pages
+- add test logs and reviewer evidence artifacts
+- finish acceptance checklist with final pass/fail counts
+
+### 2) UX and traceability refinement
+
+- richer resource-to-evidence cross-links from inventory pages
+- tighter target-scoped resource drill-down flows
+- optional saved reviewer presets for common governance filters
+
+### 3) Test depth
+
+- expand browser-level E2E coverage beyond the current minimum governance drill-down flow
+- optional DTO snapshot tests for governance responses
+
+## Still deferred beyond v0.2
+
 - write-back workflows
-- embedded chat or prompt editors
-- full RBAC implementation
-
-These remain explicitly out of scope unless approved for a later product phase.
+- privileged control actions
+- chat UX
+- RBAC implementation
+- approval workflow engine
+- real-time event bus
+- remote execution

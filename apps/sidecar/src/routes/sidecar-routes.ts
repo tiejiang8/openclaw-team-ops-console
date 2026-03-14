@@ -60,6 +60,75 @@ export function createSidecarRouter(service: SidecarService, adapter: SidecarInv
     });
   }));
 
+  router.get("/sidecar/targets", handleAsync(async (_request, response) => {
+    const snapshot = await service.getSnapshot();
+    const targets = await service.getTargets();
+    response.json({
+      data: targets,
+      meta: {
+        ...createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          warnings: snapshot.warnings,
+        }),
+        count: targets.length,
+      },
+    });
+  }));
+
+  router.get("/sidecar/targets/:id", handleAsync(async (request, response) => {
+    const snapshot = await service.getSnapshot();
+    const targetId = request.params.id ?? "";
+    const target = await service.getTargetById(targetId);
+
+    if (!target) {
+      const body: ErrorResponse = {
+        error: {
+          code: "TARGET_NOT_FOUND",
+          message: `Target ${targetId} was not found`,
+        },
+        meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          warnings: snapshot.warnings,
+        }),
+      };
+      response.status(404).json(body);
+      return;
+    }
+
+    response.json({
+      data: target,
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        warnings: snapshot.warnings,
+      }),
+    });
+  }));
+
+  router.get("/sidecar/targets/:id/summary", handleAsync(async (request, response) => {
+    const snapshot = await service.getSnapshot();
+    const targetId = request.params.id ?? "";
+    const targetSummary = await service.getTargetSummary(targetId);
+
+    if (!targetSummary) {
+      const body: ErrorResponse = {
+        error: {
+          code: "TARGET_NOT_FOUND",
+          message: `Target ${targetId} was not found`,
+        },
+        meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+          warnings: snapshot.warnings,
+        }),
+      };
+      response.status(404).json(body);
+      return;
+    }
+
+    response.json({
+      data: targetSummary,
+      meta: createResponseMeta(snapshot.generatedAt, snapshot.source, {
+        collections: snapshot.collections,
+        warnings: snapshot.warnings,
+      }),
+    });
+  }));
+
   router.get("/sidecar/agents", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     response.json({

@@ -7,6 +7,10 @@ export function ConsoleLayout() {
   const { language, setLanguage, t } = useI18n();
   const navItems = [
     { to: "/", label: t("nav.overview") },
+    { to: "/targets", label: t("nav.targets") },
+    { to: "/risks", label: t("nav.risks") },
+    { to: "/findings", label: t("nav.findings") },
+    { to: "/evidence", label: t("nav.evidence") },
     { to: "/agents", label: t("nav.agents") },
     { to: "/workspaces", label: t("nav.workspaces") },
     { to: "/sessions", label: t("nav.sessions") },

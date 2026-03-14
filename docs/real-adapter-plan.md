@@ -45,7 +45,7 @@ Constraints:
 
 ### 2. CLI status adapter
 
-Current status: future work.
+Current status: confirmed external surface, implementation pending.
 
 Spawn documented read-only CLI commands and normalize their output.
 
@@ -56,16 +56,20 @@ Best candidates:
 - `openclaw gateway status --json`
 - `openclaw health --json`
 - `openclaw channels status --probe`
+- `openclaw gateway call status`
+- `openclaw gateway call health`
+- `openclaw gateway call sessions.list --params '{}'`
 
 Constraints:
 
 - depends on CLI availability on the host
 - machine-readable output is preferred; text parsing should be a fallback only
 - probe timeouts and auth failures must surface as degraded metadata, not crashes
+- `gateway call` use must be restricted to allowlisted read-only methods only
 
 ### 3. Gateway health adapter
 
-Current status: future work.
+Current status: confirmed external surface, implementation pending.
 
 Use documented gateway health endpoints for runtime and dependency posture.
 
@@ -107,7 +111,7 @@ Real adapters should populate:
 Recommended precedence:
 
 1. `baseline` mock mode by default
-2. filesystem adapter when `OPENCLAW_RUNTIME_ROOT`, `OPENCLAW_CONFIG_FILE`, or `OPENCLAW_WORKSPACE_GLOB` is configured
+2. filesystem adapter when `OPENCLAW_RUNTIME_ROOT`, `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_FILE`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_WORKSPACE_GLOB`, or `OPENCLAW_PROFILE` is configured
 3. per-collection downgrade to `partial` or `unavailable` when a source fails
 4. preserve last known normalized snapshot only when staleness is clearly surfaced
 

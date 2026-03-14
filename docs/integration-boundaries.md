@@ -40,6 +40,12 @@ When integrating real OpenClaw sources later:
 4. avoid introducing coupling to OpenClaw internal codepaths
 5. use only confirmed external read-only surfaces documented in `docs/external-data-sources.md`
 
+Confirmed examples now include:
+
+- `openclaw gateway status --json`
+- `openclaw health --json`
+- allowlisted read-only `openclaw gateway call ...` methods such as `status`, `health`, and `sessions.list`
+
 ## Explicit Exclusions
 
 - `openclaw doctor` is not a valid adapter source because it can repair or mutate state.

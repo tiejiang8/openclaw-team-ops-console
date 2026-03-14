@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { glob, readFile, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -32,9 +33,12 @@ const RUNTIME_SOURCE_ID = "filesystem:runtime-root";
 const WORKSPACE_SOURCE_ID = "filesystem:workspace-scan";
 const SOURCE_ROOT_SOURCE_ID = "filesystem:source-root";
 const SESSION_ACTIVITY_WINDOW_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_OPENCLAW_STATE_DIRNAME = ".openclaw";
+const LEGACY_CONFIG_FILENAMES = ["clawdbot.json", "moldbot.json", "moltbot.json"] as const;
 
 const WORKSPACE_BOOTSTRAP_FILES = [
   "AGENTS.md",
+  "BOOT.md",
   "SOUL.md",
   "TOOLS.md",
   "BOOTSTRAP.md",
@@ -53,10 +57,14 @@ interface FilesystemOpenClawAdapterClock {
 
 export interface FilesystemOpenClawAdapterOptions {
   runtimeRoot?: string | undefined;
+  stateDir?: string | undefined;
   configFile?: string | undefined;
+  configPath?: string | undefined;
   workspaceGlob?: string | undefined;
   sourceRoot?: string | undefined;
+  profile?: string | undefined;
   clock?: FilesystemOpenClawAdapterClock | undefined;
+  homedir?: (() => string) | undefined;
 }
 
 interface ResolvedFilesystemPaths {
@@ -64,6 +72,7 @@ interface ResolvedFilesystemPaths {
   configFile: string | undefined;
   workspaceGlob: string | undefined;
   sourceRoot: string | undefined;
+  profile: string | undefined;
   configBaseDir: string;
 }
 
@@ -73,6 +82,9 @@ interface RawOpenClawConfig {
       workspace?: string;
     };
     list?: RawAgentConfig[];
+  };
+  session?: {
+    store?: string;
   };
   bindings?: RawBindingConfig[];
 }
@@ -104,6 +116,8 @@ interface AgentDefinition {
   workspacePath: string | undefined;
   agentDirPath: string | undefined;
   sessionStorePath: string | undefined;
+  sessionStoreCandidatePaths: string[];
+  resolvedSessionStorePath: string | undefined;
   authProfilesPath: string | undefined;
   sessionCount: number;
   lastSessionActivityAt: string | undefined;
@@ -135,21 +149,138 @@ function normalizeInput(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function expandHomeDirectory(input: string): string {
+function normalizeProfile(value?: string): string | undefined {
+  const normalized = normalizeInput(value);
+
+  return normalized ? normalized : undefined;
+}
+
+function expandHomeDirectory(input: string, homedir: () => string = os.homedir): string {
   if (input === "~") {
-    return os.homedir();
+    return homedir();
   }
 
   if (input.startsWith("~/") || input.startsWith("~\\")) {
-    return path.join(os.homedir(), input.slice(2));
+    return path.join(homedir(), input.slice(2));
   }
 
   return input;
 }
 
-function resolvePathInput(input: string, baseDir: string): string {
-  const expanded = expandHomeDirectory(input);
+function resolvePathInput(input: string, baseDir: string, homedir: () => string = os.homedir): string {
+  const expanded = expandHomeDirectory(input, homedir);
   return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(baseDir, expanded);
+}
+
+function resolveProfileAwareStateDir(profile: string | undefined, homedir: () => string): string {
+  if (profile && profile.toLowerCase() !== "default") {
+    return path.join(homedir(), `.openclaw-${profile}`);
+  }
+
+  return path.join(homedir(), DEFAULT_OPENCLAW_STATE_DIRNAME);
+}
+
+function resolveCanonicalConfigCandidates(runtimeRoot: string): string[] {
+  return [
+    path.join(runtimeRoot, "openclaw.json"),
+    ...LEGACY_CONFIG_FILENAMES.map((fileName) => path.join(runtimeRoot, fileName)),
+  ];
+}
+
+function selectConfigCandidate(candidates: string[]): string | undefined {
+  const existing = candidates.find((candidate) => {
+    try {
+      return existsSync(candidate);
+    } catch {
+      return false;
+    }
+  });
+
+  return existing ?? candidates[0];
+}
+
+function resolveDefaultWorkspacePath(profile: string | undefined, homedir: () => string): string {
+  if (profile && profile.toLowerCase() !== "default") {
+    return path.join(homedir(), DEFAULT_OPENCLAW_STATE_DIRNAME, `workspace-${profile}`);
+  }
+
+  return path.join(homedir(), DEFAULT_OPENCLAW_STATE_DIRNAME, "workspace");
+}
+
+function resolveRuntimeAgentWorkspacePath(agentId: string, homedir: () => string): string {
+  return path.join(homedir(), DEFAULT_OPENCLAW_STATE_DIRNAME, `workspace-${agentId}`);
+}
+
+function resolveDefaultWorkspaceGlob(homedir: () => string): string {
+  return path.join(homedir(), DEFAULT_OPENCLAW_STATE_DIRNAME, "workspace*");
+}
+
+function resolveDefaultConfiguredAgentId(rawAgentList: RawAgentConfig[]): string | undefined {
+  const configuredDefault = rawAgentList.find(
+    (agent) => typeof agent.id === "string" && agent.id.trim().length > 0 && agent.default === true,
+  );
+
+  if (configuredDefault?.id) {
+    return configuredDefault.id;
+  }
+
+  return rawAgentList.find((agent) => typeof agent.id === "string" && agent.id.trim().length > 0)?.id;
+}
+
+function isPrimaryAgent(agentId: string, defaultAgentId: string | undefined): boolean {
+  const normalizedAgentId = agentId.trim().toLowerCase();
+  const normalizedDefaultId = defaultAgentId?.trim().toLowerCase();
+
+  return normalizedAgentId === "main" || (normalizedDefaultId !== undefined && normalizedAgentId === normalizedDefaultId);
+}
+
+function resolveAgentWorkspacePath(input: {
+  agentId: string;
+  configuredWorkspace: string | undefined;
+  defaultWorkspacePath: string | undefined;
+  defaultAgentId: string | undefined;
+  configBaseDir: string;
+  homedir: () => string;
+}): string | undefined {
+  if (typeof input.configuredWorkspace === "string" && input.configuredWorkspace.trim().length > 0) {
+    return resolvePathInput(input.configuredWorkspace, input.configBaseDir, input.homedir);
+  }
+
+  if (isPrimaryAgent(input.agentId, input.defaultAgentId)) {
+    return input.defaultWorkspacePath;
+  }
+
+  return resolveRuntimeAgentWorkspacePath(input.agentId, input.homedir);
+}
+
+function interpolateAgentTemplate(template: string, agentId: string): string {
+  return template.replaceAll("{agentId}", agentId).replaceAll("{{agentId}}", agentId);
+}
+
+function resolveAgentSessionStorePath(input: {
+  configuredTemplate: string | undefined;
+  agentId: string;
+  configBaseDir: string;
+  runtimeRoot: string | undefined;
+  homedir: () => string;
+}): string | undefined {
+  if (typeof input.configuredTemplate === "string" && input.configuredTemplate.trim().length > 0) {
+    return resolvePathInput(
+      interpolateAgentTemplate(input.configuredTemplate, input.agentId),
+      input.configBaseDir,
+      input.homedir,
+    );
+  }
+
+  if (input.runtimeRoot) {
+    return path.join(input.runtimeRoot, "agents", input.agentId, "sessions", "sessions.json");
+  }
+
+  return undefined;
+}
+
+function resolveLegacyDefaultSessionStorePath(runtimeRoot: string | undefined): string | undefined {
+  return runtimeRoot ? path.join(runtimeRoot, "sessions", "sessions.json") : undefined;
 }
 
 function toIsoDate(value: string | number | Date | undefined): string | undefined {
@@ -188,6 +319,7 @@ async function resolveConfigValue(
   currentFile: string,
   depth: number,
   seen: Set<string>,
+  homedir: () => string,
 ): Promise<{ value: unknown; files: string[] }> {
   if (depth > 10) {
     throw new Error(`Config include depth exceeded while reading ${currentFile}`);
@@ -198,7 +330,7 @@ async function resolveConfigValue(
     const files: string[] = [];
 
     for (const item of value) {
-      const resolved = await resolveConfigValue(item, currentFile, depth + 1, seen);
+      const resolved = await resolveConfigValue(item, currentFile, depth + 1, seen, homedir);
       items.push(resolved.value);
       files.push(...resolved.files);
     }
@@ -230,8 +362,8 @@ async function resolveConfigValue(
         throw new Error(`Config include in ${currentFile} must be a string or string array.`);
       }
 
-      const absoluteIncludePath = resolvePathInput(includePath, path.dirname(currentFile));
-      const loaded = await loadConfigFile(absoluteIncludePath, depth + 1, seen);
+      const absoluteIncludePath = resolvePathInput(includePath, path.dirname(currentFile), homedir);
+      const loaded = await loadConfigFile(absoluteIncludePath, depth + 1, seen, homedir);
       files.push(...loaded.files);
       mergedInclude = initialized ? deepMerge(mergedInclude, loaded.data) : loaded.data;
       initialized = true;
@@ -247,7 +379,7 @@ async function resolveConfigValue(
       continue;
     }
 
-    const resolved = await resolveConfigValue(child, currentFile, depth + 1, seen);
+    const resolved = await resolveConfigValue(child, currentFile, depth + 1, seen, homedir);
     siblings[key] = resolved.value;
     files.push(...resolved.files);
   }
@@ -258,7 +390,12 @@ async function resolveConfigValue(
   };
 }
 
-async function loadConfigFile(filePath: string, depth = 0, seen = new Set<string>()): Promise<ParsedConfigResult> {
+async function loadConfigFile(
+  filePath: string,
+  depth = 0,
+  seen = new Set<string>(),
+  homedir: () => string = os.homedir,
+): Promise<ParsedConfigResult> {
   const resolvedPath = path.resolve(filePath);
 
   if (seen.has(resolvedPath)) {
@@ -270,7 +407,7 @@ async function loadConfigFile(filePath: string, depth = 0, seen = new Set<string
 
   const raw = await readFile(resolvedPath, "utf8");
   const parsed = JSON5.parse(raw) as unknown;
-  const resolved = await resolveConfigValue(parsed, resolvedPath, depth, nextSeen);
+  const resolved = await resolveConfigValue(parsed, resolvedPath, depth, nextSeen, homedir);
 
   if (!isRecord(resolved.value)) {
     throw new Error(`Expected an object config at ${resolvedPath}`);
@@ -702,17 +839,25 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
   };
 
   private readonly runtimeRootInput: string | undefined;
+  private readonly stateDirInput: string | undefined;
   private readonly configFileInput: string | undefined;
+  private readonly configPathInput: string | undefined;
   private readonly workspaceGlobInput: string | undefined;
   private readonly sourceRootInput: string | undefined;
+  private readonly profileInput: string | undefined;
   private readonly clock: FilesystemOpenClawAdapterClock;
+  private readonly homedir: () => string;
 
   constructor(options: FilesystemOpenClawAdapterOptions = {}) {
     this.runtimeRootInput = normalizeInput(options.runtimeRoot);
+    this.stateDirInput = normalizeInput(options.stateDir);
     this.configFileInput = normalizeInput(options.configFile);
+    this.configPathInput = normalizeInput(options.configPath);
     this.workspaceGlobInput = normalizeInput(options.workspaceGlob);
     this.sourceRootInput = normalizeInput(options.sourceRoot);
+    this.profileInput = normalizeProfile(options.profile);
     this.clock = options.clock ?? { now: () => new Date() };
+    this.homedir = options.homedir ?? os.homedir;
   }
 
   async describeSources(): Promise<AdapterSourceDescriptor[]> {
@@ -820,7 +965,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
 
     if (resolved.configFile) {
       try {
-        parsedConfig = await loadConfigFile(resolved.configFile);
+        parsedConfig = await loadConfigFile(resolved.configFile, 0, new Set<string>(), this.homedir);
       } catch (error) {
         const code =
           isNodeError(error) && error.code === "ENOENT"
@@ -841,10 +986,13 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     const rawAgentList = Array.isArray(parsedConfig?.data.agents?.list)
       ? parsedConfig?.data.agents?.list.filter(isRecord).map((entry) => entry as RawAgentConfig)
       : [];
+    const defaultAgentId = resolveDefaultConfiguredAgentId(rawAgentList);
     const defaultWorkspacePath =
       typeof parsedConfig?.data.agents?.defaults?.workspace === "string"
-        ? resolvePathInput(parsedConfig.data.agents.defaults.workspace, configBaseDir)
-        : undefined;
+        ? resolvePathInput(parsedConfig.data.agents.defaults.workspace, configBaseDir, this.homedir)
+        : resolveDefaultWorkspacePath(resolved.profile, this.homedir);
+    const configuredSessionStoreTemplate =
+      typeof parsedConfig?.data.session?.store === "string" ? parsedConfig.data.session.store : undefined;
     const rawBindings = Array.isArray(parsedConfig?.data.bindings)
       ? parsedConfig.data.bindings.filter(isRecord).map((entry) => entry as RawBindingConfig)
       : [];
@@ -871,26 +1019,45 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       }
 
       const workspacePath =
-        typeof rawAgent.workspace === "string"
-          ? resolvePathInput(rawAgent.workspace, configBaseDir)
-          : defaultWorkspacePath;
+        resolveAgentWorkspacePath({
+          agentId: rawAgent.id,
+          configuredWorkspace: rawAgent.workspace,
+          defaultWorkspacePath,
+          defaultAgentId,
+          configBaseDir,
+          homedir: this.homedir,
+        });
       const agentDirPath =
         typeof rawAgent.agentDir === "string"
-          ? resolvePathInput(rawAgent.agentDir, configBaseDir)
+          ? resolvePathInput(rawAgent.agentDir, configBaseDir, this.homedir)
           : resolved.runtimeRoot
             ? path.join(resolved.runtimeRoot, "agents", rawAgent.id, "agent")
             : undefined;
+      const sessionStorePath = resolveAgentSessionStorePath({
+        configuredTemplate: configuredSessionStoreTemplate,
+        agentId: rawAgent.id,
+        configBaseDir,
+        runtimeRoot: resolved.runtimeRoot,
+        homedir: this.homedir,
+      });
+      const sessionStoreCandidatePaths = sessionStorePath ? [sessionStorePath] : [];
+      const legacySessionStorePath =
+        isPrimaryAgent(rawAgent.id, defaultAgentId) && resolved.runtimeRoot
+          ? resolveLegacyDefaultSessionStorePath(resolved.runtimeRoot)
+          : undefined;
+
+      if (legacySessionStorePath && legacySessionStorePath !== sessionStorePath) {
+        sessionStoreCandidatePaths.push(legacySessionStorePath);
+      }
 
       agentDefinitions.set(rawAgent.id, {
         id: rawAgent.id,
         rawConfig: rawAgent,
         workspacePath,
         agentDirPath,
-        sessionStorePath: agentDirPath
-          ? path.join(path.dirname(agentDirPath), "sessions", "sessions.json")
-          : resolved.runtimeRoot
-            ? path.join(resolved.runtimeRoot, "agents", rawAgent.id, "sessions", "sessions.json")
-            : undefined,
+        sessionStorePath,
+        sessionStoreCandidatePaths,
+        resolvedSessionStorePath: undefined,
         authProfilesPath: agentDirPath ? path.join(agentDirPath, "auth-profiles.json") : undefined,
         sessionCount: 0,
         lastSessionActivityAt: undefined,
@@ -914,15 +1081,39 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       const agentDirPath = resolved.runtimeRoot
         ? path.join(resolved.runtimeRoot, "agents", runtimeAgentId, "agent")
         : undefined;
+      const workspacePath = resolveAgentWorkspacePath({
+        agentId: runtimeAgentId,
+        configuredWorkspace: undefined,
+        defaultWorkspacePath,
+        defaultAgentId,
+        configBaseDir,
+        homedir: this.homedir,
+      });
+      const sessionStorePath = resolveAgentSessionStorePath({
+        configuredTemplate: configuredSessionStoreTemplate,
+        agentId: runtimeAgentId,
+        configBaseDir,
+        runtimeRoot: resolved.runtimeRoot,
+        homedir: this.homedir,
+      });
+      const sessionStoreCandidatePaths = sessionStorePath ? [sessionStorePath] : [];
+      const legacySessionStorePath =
+        isPrimaryAgent(runtimeAgentId, defaultAgentId) && resolved.runtimeRoot
+          ? resolveLegacyDefaultSessionStorePath(resolved.runtimeRoot)
+          : undefined;
+
+      if (legacySessionStorePath && legacySessionStorePath !== sessionStorePath) {
+        sessionStoreCandidatePaths.push(legacySessionStorePath);
+      }
 
       agentDefinitions.set(runtimeAgentId, {
         id: runtimeAgentId,
         rawConfig: undefined,
-        workspacePath: defaultWorkspacePath,
+        workspacePath,
         agentDirPath,
-        sessionStorePath: resolved.runtimeRoot
-          ? path.join(resolved.runtimeRoot, "agents", runtimeAgentId, "sessions", "sessions.json")
-          : undefined,
+        sessionStorePath,
+        sessionStoreCandidatePaths,
+        resolvedSessionStorePath: undefined,
         authProfilesPath: agentDirPath ? path.join(agentDirPath, "auth-profiles.json") : undefined,
         sessionCount: 0,
         lastSessionActivityAt: undefined,
@@ -933,11 +1124,8 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         sessionStoreExists: false,
       });
 
-      if (defaultWorkspacePath) {
-        workspacePathToAgents.set(defaultWorkspacePath, [
-          ...(workspacePathToAgents.get(defaultWorkspacePath) ?? []),
-          runtimeAgentId,
-        ]);
+      if (workspacePath) {
+        workspacePathToAgents.set(workspacePath, [...(workspacePathToAgents.get(workspacePath) ?? []), runtimeAgentId]);
       }
     }
 
@@ -975,8 +1163,8 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       workspacePaths.add(match);
     }
 
-    if (workspacePaths.size === 0 && resolved.runtimeRoot) {
-      const defaultRuntimeWorkspace = path.join(resolved.runtimeRoot, "workspace");
+    if (workspacePaths.size === 0) {
+      const defaultRuntimeWorkspace = resolveDefaultWorkspacePath(resolved.profile, this.homedir);
       const defaultRuntimeWorkspaceStat = await statIfExists(defaultRuntimeWorkspace);
 
       if (defaultRuntimeWorkspaceStat.exists && defaultRuntimeWorkspaceStat.isDirectory) {
@@ -1116,13 +1304,45 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
 
       agentDefinition.primaryAuthProfileId = primaryAuthProfileId(agentDefinition.authProfileIds);
 
-      if (agentDefinition.sessionStorePath) {
-        const sessionStoreStat = await statIfExists(agentDefinition.sessionStorePath);
+      if (agentDefinition.sessionStoreCandidatePaths.length > 0) {
+        let resolvedSessionStorePath = agentDefinition.sessionStorePath;
+        let sessionStoreStat = await statIfExists(resolvedSessionStorePath);
+
+        if (!sessionStoreStat.exists || !sessionStoreStat.isFile) {
+          for (const candidatePath of agentDefinition.sessionStoreCandidatePaths) {
+            const candidateStat = await statIfExists(candidatePath);
+
+            if (candidateStat.exists && candidateStat.isFile) {
+              resolvedSessionStorePath = candidatePath;
+              sessionStoreStat = candidateStat;
+              break;
+            }
+          }
+        }
+
+        agentDefinition.resolvedSessionStorePath = resolvedSessionStorePath;
         agentDefinition.sessionStoreExists = sessionStoreStat.exists && sessionStoreStat.isFile;
+
+        if (
+          agentDefinition.sessionStoreExists &&
+          resolvedSessionStorePath &&
+          agentDefinition.sessionStorePath &&
+          resolvedSessionStorePath !== agentDefinition.sessionStorePath
+        ) {
+          addWarning(
+            warning(
+              "OPENCLAW_SESSION_STORE_LEGACY_PATH_USED",
+              "info",
+              `Using legacy session store path for ${agentDefinition.id}: ${resolvedSessionStorePath}`,
+              "sessions",
+              RUNTIME_SOURCE_ID,
+            ),
+          );
+        }
 
         if (agentDefinition.sessionStoreExists) {
           try {
-            const parsed = await parseJsonFile<Record<string, unknown>>(agentDefinition.sessionStorePath);
+            const parsed = await parseJsonFile<Record<string, unknown>>(resolvedSessionStorePath as string);
 
             if (isRecord(parsed.data)) {
               for (const [sessionKey, sessionValue] of Object.entries(parsed.data)) {
@@ -1597,7 +1817,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
 
     if (resolved.configFile) {
       try {
-        parsedConfig = await loadConfigFile(resolved.configFile);
+        parsedConfig = await loadConfigFile(resolved.configFile, 0, new Set<string>(), this.homedir);
       } catch {
         parsedConfig = undefined;
       }
@@ -1607,10 +1827,11 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     const rawAgentList = Array.isArray(parsedConfig?.data.agents?.list)
       ? parsedConfig.data.agents.list.filter(isRecord).map((entry) => entry as RawAgentConfig)
       : [];
+    const defaultAgentId = resolveDefaultConfiguredAgentId(rawAgentList);
     const defaultWorkspacePath =
       typeof parsedConfig?.data.agents?.defaults?.workspace === "string"
-        ? resolvePathInput(parsedConfig.data.agents.defaults.workspace, configBaseDir)
-        : undefined;
+        ? resolvePathInput(parsedConfig.data.agents.defaults.workspace, configBaseDir, this.homedir)
+        : resolveDefaultWorkspacePath(resolved.profile, this.homedir);
     const workspacePathToAgents = new Map<string, string[]>();
 
     for (const rawAgent of rawAgentList) {
@@ -1618,10 +1839,14 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         continue;
       }
 
-      const workspacePath =
-        typeof rawAgent.workspace === "string"
-          ? resolvePathInput(rawAgent.workspace, configBaseDir)
-          : defaultWorkspacePath;
+      const workspacePath = resolveAgentWorkspacePath({
+        agentId: rawAgent.id,
+        configuredWorkspace: rawAgent.workspace,
+        defaultWorkspacePath,
+        defaultAgentId,
+        configBaseDir,
+        homedir: this.homedir,
+      });
 
       if (workspacePath) {
         workspacePathToAgents.set(workspacePath, [...(workspacePathToAgents.get(workspacePath) ?? []), rawAgent.id]);
@@ -1646,8 +1871,8 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       }
     }
 
-    if (workspacePaths.size === 0 && resolved.runtimeRoot) {
-      const defaultRuntimeWorkspace = path.join(resolved.runtimeRoot, "workspace");
+    if (workspacePaths.size === 0) {
+      const defaultRuntimeWorkspace = resolveDefaultWorkspacePath(resolved.profile, this.homedir);
       const defaultRuntimeWorkspaceStat = await statIfExists(defaultRuntimeWorkspace);
 
       if (defaultRuntimeWorkspaceStat.exists && defaultRuntimeWorkspaceStat.isDirectory) {
@@ -1671,20 +1896,21 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
   }
 
   private resolvePaths(): ResolvedFilesystemPaths {
-    const runtimeRoot = this.runtimeRootInput
-      ? resolvePathInput(this.runtimeRootInput, process.cwd())
-      : undefined;
+    const profile = this.profileInput;
+    const runtimeRootInput = this.runtimeRootInput ?? this.stateDirInput;
+    const runtimeRoot = runtimeRootInput
+      ? resolvePathInput(runtimeRootInput, process.cwd(), this.homedir)
+      : resolveProfileAwareStateDir(profile, this.homedir);
     const configBaseDir = runtimeRoot ?? process.cwd();
-    const configFile = this.configFileInput
-      ? resolvePathInput(this.configFileInput, configBaseDir)
-      : runtimeRoot
-        ? path.join(runtimeRoot, "openclaw.json")
-        : undefined;
+    const configInput = this.configFileInput ?? this.configPathInput;
+    const configFile = configInput
+      ? resolvePathInput(configInput, configBaseDir, this.homedir)
+      : selectConfigCandidate(resolveCanonicalConfigCandidates(runtimeRoot));
     const workspaceGlob = this.workspaceGlobInput
-      ? resolvePathInput(this.workspaceGlobInput, runtimeRoot ?? process.cwd())
-      : undefined;
+      ? resolvePathInput(this.workspaceGlobInput, runtimeRoot ?? process.cwd(), this.homedir)
+      : resolveDefaultWorkspaceGlob(this.homedir);
     const sourceRoot = this.sourceRootInput
-      ? resolvePathInput(this.sourceRootInput, process.cwd())
+      ? resolvePathInput(this.sourceRootInput, process.cwd(), this.homedir)
       : undefined;
 
     return {
@@ -1692,6 +1918,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       configFile,
       workspaceGlob,
       sourceRoot,
+      profile,
       configBaseDir,
     };
   }

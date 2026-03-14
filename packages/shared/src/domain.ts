@@ -47,6 +47,75 @@ export type AdapterSourceKind = (typeof ADAPTER_SOURCE_KINDS)[number];
 export const SOURCE_CONFIDENCE_LEVELS = ["confirmed", "assumption"] as const;
 export type SourceConfidenceLevel = (typeof SOURCE_CONFIDENCE_LEVELS)[number];
 
+export const TARGET_TYPES = ["local-runtime", "remote-runtime", "customer-instance"] as const;
+export type TargetType = (typeof TARGET_TYPES)[number];
+
+export const TARGET_ENVIRONMENTS = ["development", "staging", "production", "sandbox", "unknown"] as const;
+export type TargetEnvironment = (typeof TARGET_ENVIRONMENTS)[number];
+
+export const TARGET_SOURCE_KINDS = ["filesystem", "mock", "cli", "gateway-health", "logs"] as const;
+export type TargetSourceKind = (typeof TARGET_SOURCE_KINDS)[number];
+
+export const EVIDENCE_KINDS = [
+  "config-parse",
+  "config-include",
+  "file-missing",
+  "workspace-scan",
+  "session-store",
+  "auth-profile-scan",
+  "binding-parse",
+  "snapshot-freshness",
+  "coverage-gap",
+  "runtime-health",
+] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+export const EVIDENCE_SOURCES = ["filesystem", "mock", "overlay-api", "derived-rule"] as const;
+export type EvidenceSource = (typeof EVIDENCE_SOURCES)[number];
+
+export const EVIDENCE_SUBJECT_TYPES = [
+  "target",
+  "agent",
+  "workspace",
+  "session",
+  "binding",
+  "auth-profile",
+  "collection",
+  "topology-edge",
+] as const;
+export type EvidenceSubjectType = (typeof EVIDENCE_SUBJECT_TYPES)[number];
+
+export const FINDING_TYPES = [
+  "orphan-session",
+  "dangling-binding",
+  "config-include-anomaly",
+  "workspace-drift",
+  "snapshot-freshness-degradation",
+] as const;
+export type FindingType = (typeof FINDING_TYPES)[number];
+
+export const FINDING_SEVERITIES = ["critical", "high", "medium", "low"] as const;
+export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+
+export const FINDING_STATUSES = ["open", "no-longer-observed"] as const;
+export type FindingStatus = (typeof FINDING_STATUSES)[number];
+
+export const RECOMMENDATION_TYPES = [
+  "inspect-file",
+  "inspect-directory",
+  "run-cli",
+  "compare-config",
+  "verify-workspace",
+  "collect-fresh-snapshot",
+] as const;
+export type RecommendationType = (typeof RECOMMENDATION_TYPES)[number];
+
+export const RECOMMENDATION_PRIORITIES = ["high", "medium", "low"] as const;
+export type RecommendationPriority = (typeof RECOMMENDATION_PRIORITIES)[number];
+
+export const RECOMMENDATION_SAFETY_LEVELS = ["safe-read-only", "requires-human-review"] as const;
+export type RecommendationSafetyLevel = (typeof RECOMMENDATION_SAFETY_LEVELS)[number];
+
 export interface SnapshotWarning {
   code: string;
   severity: SnapshotWarningSeverity;
@@ -181,6 +250,126 @@ export interface InventorySummary {
     authProfiles: Record<string, number>;
     runtime: Record<string, number>;
   };
+}
+
+export interface TargetConnection {
+  runtimeRoot?: string;
+  configFile?: string;
+  workspaceGlob?: string;
+  sourceRoot?: string;
+  gatewayUrl?: string;
+  dashboardUrl?: string;
+}
+
+export interface TargetCollectionPolicy {
+  mode: "on-demand-snapshot";
+  readOnly: true;
+  mockFallbackAllowed: boolean;
+}
+
+export interface TargetCoverage {
+  completeCollections: number;
+  partialCollections: number;
+  unavailableCollections: number;
+}
+
+export interface Target {
+  id: string;
+  name: string;
+  type: TargetType;
+  environment: TargetEnvironment;
+  owner?: string;
+  sourceKind: TargetSourceKind;
+  connection: TargetConnection;
+  collectionPolicy: TargetCollectionPolicy;
+  status: EntityStatus;
+  lastCollectedAt?: IsoDateString;
+  freshness: CollectionFreshness;
+  warningCount: number;
+  riskScore: number;
+  coverage: TargetCoverage;
+}
+
+export interface TargetSnapshotSummary {
+  target: Target;
+  summary: InventorySummary;
+  collections: Record<CollectionName, CollectionMetadata>;
+  runtimeStatuses: RuntimeStatus[];
+  warnings: SnapshotWarning[];
+  agents: Agent[];
+  workspaces: Workspace[];
+  sessions: Session[];
+  bindings: BindingRoute[];
+  authProfiles: AuthProfile[];
+  topology: TopologyView;
+}
+
+export interface Evidence {
+  id: string;
+  targetId: string;
+  targetName?: string;
+  kind: EvidenceKind;
+  source: EvidenceSource;
+  subjectType: EvidenceSubjectType;
+  subjectId: string;
+  subjectLabel?: string;
+  severity: SnapshotWarningSeverity;
+  message: string;
+  details: Record<string, string | number | boolean | null>;
+  observedAt: IsoDateString;
+  freshness: CollectionFreshness;
+  pathRefs?: string[];
+  fieldRefs?: string[];
+}
+
+export interface Finding {
+  id: string;
+  type: FindingType;
+  severity: FindingSeverity;
+  status: FindingStatus;
+  summary: string;
+  targetId: string;
+  targetName?: string;
+  subjectType: EvidenceSubjectType;
+  subjectId: string;
+  subjectLabel?: string;
+  evidenceRefs: string[];
+  recommendationIds: string[];
+  observedAt: IsoDateString;
+  score: number;
+}
+
+export interface Recommendation {
+  id: string;
+  findingId: string;
+  type: RecommendationType;
+  title: string;
+  body: string;
+  priority: RecommendationPriority;
+  requiresHuman: boolean;
+  commandTemplate?: string;
+  pathHint?: string;
+  docLink?: string;
+  safetyLevel?: RecommendationSafetyLevel;
+}
+
+export interface TargetRiskSummary {
+  targetId: string;
+  targetName: string;
+  openFindings: number;
+  highestScore: number;
+  highestSeverity?: FindingSeverity;
+}
+
+export interface RisksSummary {
+  generatedAt: IsoDateString;
+  openFindings: number;
+  bySeverity: Record<FindingSeverity, number>;
+  byType: Record<string, number>;
+  staleTargets: number;
+  coverageGaps: number;
+  highestRiskScore: number;
+  targetBreakdown: TargetRiskSummary[];
 }
 
 export type TopologyNodeType = "workspace" | "agent" | "session" | "binding" | "auth-profile";

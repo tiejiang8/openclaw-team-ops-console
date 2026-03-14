@@ -1,0 +1,63 @@
+{
+  "data": [
+    {
+      "id": "mock-baseline",
+      "name": "Mock Baseline",
+      "type": "local-runtime",
+      "environment": "sandbox",
+      "owner": "team-ops",
+      "sourceKind": "mock",
+      "connection": {},
+      "collectionPolicy": {
+        "mode": "on-demand-snapshot",
+        "readOnly": true,
+        "mockFallbackAllowed": true
+      },
+      "status": "healthy",
+      "lastCollectedAt": "2026-03-14T10:20:00.000Z",
+      "freshness": "fresh",
+      "warningCount": 1,
+      "riskScore": 20,
+      "coverage": {
+        "completeCollections": 7,
+        "partialCollections": 0,
+        "unavailableCollections": 0
+      }
+    },
+    {
+      "id": "local-runtime-dev",
+      "name": "Local Runtime Dev",
+      "type": "local-runtime",
+      "environment": "development",
+      "owner": "team-ops",
+      "sourceKind": "filesystem",
+      "connection": {
+        "runtimeRoot": "/home/example/.openclaw",
+        "configFile": "/home/example/.openclaw/openclaw.json",
+        "workspaceGlob": "/home/example/.openclaw/workspace*",
+        "sourceRoot": "/home/example/code/openclaw"
+      },
+      "collectionPolicy": {
+        "mode": "on-demand-snapshot",
+        "readOnly": true,
+        "mockFallbackAllowed": false
+      },
+      "status": "degraded",
+      "lastCollectedAt": "2026-03-14T10:19:40.000Z",
+      "freshness": "stale",
+      "warningCount": 5,
+      "riskScore": 74,
+      "coverage": {
+        "completeCollections": 4,
+        "partialCollections": 2,
+        "unavailableCollections": 1
+      }
+    }
+  ],
+  "meta": {
+    "generatedAt": "2026-03-14T10:20:00.000Z",
+    "source": "mixed",
+    "readOnly": true,
+    "count": 2
+  }
+}

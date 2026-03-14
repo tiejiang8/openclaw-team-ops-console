@@ -10,13 +10,20 @@ import { overlayApi } from "../lib/api.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
-  const { language, t, translateComponentType } = useI18n();
+  const { language, t, translateComponentType, translateFreshness, translateSignal, translateTargetSourceKind } = useI18n();
   const loadOverview = useCallback(async () => {
-    const [health, summary] = await Promise.all([overlayApi.getHealth(), overlayApi.getSummary()]);
+    const [health, summary, targets, risksSummary] = await Promise.all([
+      overlayApi.getHealth(),
+      overlayApi.getSummary(),
+      overlayApi.getTargets(),
+      overlayApi.getRisksSummary(),
+    ]);
 
     return {
       health,
       summary,
+      targets,
+      risksSummary,
     };
   }, []);
 
@@ -28,6 +35,7 @@ export function OverviewPage() {
     }
 
     return [
+      { to: "/targets", label: t("nav.targets"), count: data.targets.data.length },
       { to: "/agents", label: t("nav.agents"), count: data.summary.data.totals.agents },
       { to: "/workspaces", label: t("nav.workspaces"), count: data.summary.data.totals.workspaces },
       { to: "/sessions", label: t("nav.sessions"), count: data.summary.data.totals.sessions },
@@ -36,6 +44,22 @@ export function OverviewPage() {
       { to: "/topology", label: t("nav.topology"), count: data.summary.runtimeStatuses.length },
     ];
   }, [data, t]);
+
+  const fleetMetrics = useMemo(() => {
+    if (!data) {
+      return {
+        targetCount: 0,
+        warningCount: 0,
+        highestRiskScore: 0,
+      };
+    }
+
+    return {
+      targetCount: data.targets.data.length,
+      warningCount: data.targets.data.reduce((count, target) => count + target.warningCount, 0),
+      highestRiskScore: Math.max(...data.targets.data.map((target) => target.riskScore), 0),
+    };
+  }, [data]);
 
   const isEmpty = !loading && !error && data?.summary.runtimeStatuses.length === 0;
 
@@ -65,6 +89,12 @@ export function OverviewPage() {
             </div>
 
             <div className="metrics-grid">
+              <MetricCard label={t("overview.metric.targets")} value={fleetMetrics.targetCount} />
+              <MetricCard label={t("overview.metric.targetWarnings")} value={fleetMetrics.warningCount} />
+              <MetricCard label={t("overview.metric.targetRisk")} value={fleetMetrics.highestRiskScore} />
+              <MetricCard label={t("overview.metric.openFindings")} value={data.risksSummary.data.openFindings} />
+              <MetricCard label={t("overview.metric.criticalFindings")} value={data.risksSummary.data.bySeverity.critical} />
+              <MetricCard label={t("overview.metric.staleTargets")} value={data.risksSummary.data.staleTargets} />
               <MetricCard label={t("overview.metric.agents")} value={data.summary.data.totals.agents} />
               <MetricCard label={t("overview.metric.workspaces")} value={data.summary.data.totals.workspaces} />
               <MetricCard
@@ -75,6 +105,60 @@ export function OverviewPage() {
               <MetricCard label={t("overview.metric.bindings")} value={data.summary.data.totals.bindings} />
               <MetricCard label={t("overview.metric.authProfiles")} value={data.summary.data.totals.authProfiles} />
               <MetricCard label={t("overview.metric.snapshotTime")} value={formatTimestamp(data.summary.meta.generatedAt, language)} />
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <h3>{t("overview.targetsTitle")}</h3>
+                <p>{t("overview.targetsDescription")}</p>
+              </div>
+
+              <div className="target-grid">
+                {data.targets.data.map((target) => (
+                  <Link key={target.id} className="target-card" to={`/targets/${target.id}`}>
+                    <div className="target-card-header">
+                      <div>
+                        <div className="cell-title">{target.name}</div>
+                        <div className="cell-subtitle">{target.id}</div>
+                      </div>
+                      <StatusBadge status={target.status} />
+                    </div>
+                    <div className="target-card-meta">
+                      <span>{translateTargetSourceKind(target.sourceKind)}</span>
+                      <span>{translateFreshness(target.freshness)}</span>
+                    </div>
+                    <div className="target-card-stats">
+                      <span>{t("targets.table.warnings")}: {target.warningCount}</span>
+                      <span>{t("targets.table.risk")}: {target.riskScore}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <h3>{t("overview.risksTitle")}</h3>
+                <p>{t("overview.risksDescription")}</p>
+              </div>
+
+              <div className="target-grid">
+                {data.risksSummary.data.targetBreakdown.slice(0, 4).map((targetRisk) => (
+                  <Link key={targetRisk.targetId} className="target-card" to="/risks">
+                    <div className="target-card-header">
+                      <div>
+                        <div className="cell-title">{targetRisk.targetName}</div>
+                        <div className="cell-subtitle">{targetRisk.targetId}</div>
+                      </div>
+                      <span className="signal-badge signal-high">{targetRisk.highestScore}</span>
+                    </div>
+                    <div className="target-card-meta">
+                      <span>{t("overview.metric.openFindings")}: {targetRisk.openFindings}</span>
+                      <span>{t("risks.table.severity")}: {targetRisk.highestSeverity ? translateSignal(targetRisk.highestSeverity) : "-"}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
 
             <div className="panel">

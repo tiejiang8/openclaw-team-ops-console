@@ -4,12 +4,18 @@ import type {
   CollectionName,
   AuthProfile,
   BindingRoute,
+  Evidence,
+  Finding,
   InventorySummary,
+  Recommendation,
+  RisksSummary,
   RuntimeStatus,
   Session,
   SnapshotSource,
   SnapshotWarning,
   SystemSnapshot,
+  Target,
+  TargetSnapshotSummary,
   TopologyView,
   Workspace,
   WorkspaceDocument,
@@ -77,6 +83,16 @@ export interface SnapshotResponse {
 
 export type AgentsResponse = ListResponse<Agent>;
 export type AgentResponse = ItemResponse<Agent>;
+export type TargetsResponse = ListResponse<Target>;
+export type TargetResponse = ItemResponse<Target>;
+export type TargetSummaryResponse = ItemResponse<TargetSnapshotSummary>;
+export type EvidencesResponse = ListResponse<Evidence>;
+export type EvidenceResponse = ItemResponse<Evidence>;
+export type FindingsResponse = ListResponse<Finding>;
+export type FindingResponse = ItemResponse<Finding>;
+export type RecommendationsResponse = ListResponse<Recommendation>;
+export type RecommendationResponse = ItemResponse<Recommendation>;
+export type RisksSummaryResponse = ItemResponse<RisksSummary>;
 export type WorkspacesResponse = ListResponse<Workspace>;
 export type WorkspaceDocumentResponse = ItemResponse<WorkspaceDocument>;
 export type SessionsResponse = ListResponse<Session>;

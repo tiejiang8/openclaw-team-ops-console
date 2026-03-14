@@ -66,6 +66,179 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
     }
   });
 
+  router.get("/api/targets", async (_request, response, next) => {
+    try {
+      response.json(await service.getTargets());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/targets/:id", async (request, response, next) => {
+    try {
+      const targetId = request.params.id ?? "";
+      const target = await service.getTargetById(targetId);
+
+      if (!target) {
+        const body: ErrorResponse = {
+          error: {
+            code: "TARGET_NOT_FOUND",
+            message: `Target ${targetId} was not found`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(target);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/targets/:id/summary", async (request, response, next) => {
+    try {
+      const targetId = request.params.id ?? "";
+      const targetSummary = await service.getTargetSummary(targetId);
+
+      if (!targetSummary) {
+        const body: ErrorResponse = {
+          error: {
+            code: "TARGET_NOT_FOUND",
+            message: `Target ${targetId} was not found`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(targetSummary);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/evidence", async (request, response, next) => {
+    try {
+      response.json(await service.getEvidences({
+        ...(typeof request.query.targetId === "string" ? { targetId: request.query.targetId } : {}),
+        ...(typeof request.query.severity === "string" ? { severity: request.query.severity } : {}),
+        ...(typeof request.query.kind === "string" ? { kind: request.query.kind } : {}),
+        ...(typeof request.query.subjectType === "string" ? { subjectType: request.query.subjectType } : {}),
+        ...(typeof request.query.subjectId === "string" ? { subjectId: request.query.subjectId } : {}),
+      }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/evidence/:id", async (request, response, next) => {
+    try {
+      const evidenceId = request.params.id ?? "";
+      const evidence = await service.getEvidenceById(evidenceId);
+
+      if (!evidence) {
+        const body: ErrorResponse = {
+          error: {
+            code: "EVIDENCE_NOT_FOUND",
+            message: `Evidence ${evidenceId} was not found`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(evidence);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/findings", async (request, response, next) => {
+    try {
+      response.json(await service.getFindings({
+        ...(typeof request.query.targetId === "string" ? { targetId: request.query.targetId } : {}),
+        ...(typeof request.query.severity === "string" ? { severity: request.query.severity } : {}),
+        ...(typeof request.query.type === "string" ? { type: request.query.type } : {}),
+        ...(typeof request.query.status === "string" ? { status: request.query.status } : {}),
+      }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/findings/:id", async (request, response, next) => {
+    try {
+      const findingId = request.params.id ?? "";
+      const finding = await service.getFindingById(findingId);
+
+      if (!finding) {
+        const body: ErrorResponse = {
+          error: {
+            code: "FINDING_NOT_FOUND",
+            message: `Finding ${findingId} was not found`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(finding);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/recommendations", async (request, response, next) => {
+    try {
+      response.json(await service.getRecommendations({
+        ...(typeof request.query.findingId === "string" ? { findingId: request.query.findingId } : {}),
+      }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/recommendations/:id", async (request, response, next) => {
+    try {
+      const recommendationId = request.params.id ?? "";
+      const recommendation = await service.getRecommendationById(recommendationId);
+
+      if (!recommendation) {
+        const body: ErrorResponse = {
+          error: {
+            code: "RECOMMENDATION_NOT_FOUND",
+            message: `Recommendation ${recommendationId} was not found`,
+          },
+          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+        };
+
+        response.status(404).json(body);
+        return;
+      }
+
+      response.json(recommendation);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/risks/summary", async (_request, response, next) => {
+    try {
+      response.json(await service.getRisksSummary());
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/api/agents", async (_request, response, next) => {
     try {
       response.json(await service.getAgents());

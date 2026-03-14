@@ -6,18 +6,37 @@ import type {
   RuntimeStatus,
   Session,
   SystemSnapshot,
+  Target,
+  TargetSnapshotSummary,
   TopologyView,
   Workspace,
   WorkspaceDocument,
 } from "@openclaw-team-ops/shared";
 
 import type { SidecarInventoryAdapter } from "../adapters/source-adapter.js";
+import { SidecarTargetCatalog } from "../targets/target-catalog.js";
 
 export class SidecarService {
-  constructor(private readonly adapter: SidecarInventoryAdapter) {}
+  private readonly targetCatalog: SidecarTargetCatalog;
+
+  constructor(private readonly adapter: SidecarInventoryAdapter) {
+    this.targetCatalog = new SidecarTargetCatalog(adapter);
+  }
 
   async getSnapshot(): Promise<SystemSnapshot> {
     return this.adapter.fetchSnapshot();
+  }
+
+  async getTargets(): Promise<Target[]> {
+    return this.targetCatalog.getTargets();
+  }
+
+  async getTargetById(targetId: string): Promise<Target | undefined> {
+    return this.targetCatalog.getTargetById(targetId);
+  }
+
+  async getTargetSummary(targetId: string): Promise<TargetSnapshotSummary | undefined> {
+    return this.targetCatalog.getTargetSummary(targetId);
   }
 
   async getAgents(): Promise<Agent[]> {

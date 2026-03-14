@@ -1,68 +1,27 @@
 # OpenClaw Team Ops Console
 
-**OpenClaw Multi-Agent Control**
+**Read-only Governance and Visibility for OpenClaw runtimes**
 
-## 中文说明
+## 中文
 
-OpenClaw Team Ops Console 是一个 **v0.1 alpha**、**独立运行**、**严格只读**、**默认 mock-first** 的运维可视化控制台，用于从外部观察 OpenClaw 的多 Agent 运行状态、工作区、会话、绑定关系与运行拓扑。
+OpenClaw Team Ops Console 当前是一套面向内部评审的 **v0.2 governance preview**：
 
-本仓库始终保持以下边界：
+- 独立运行，不依赖修改 OpenClaw core
+- 严格只读，不提供写回、控制、终止、编辑、创建等能力
+- 默认 `mock-first`
+- 保持 `sidecar + overlay-api + overlay-web` 三层架构
+- 把产品定位从“资源目录台”推进到“治理观察台”
 
-- 不修改 OpenClaw core
-- 不 import OpenClaw 源码模块
-- 不 patch / fork / vendor OpenClaw
-- 不提供写回、控制、终止、编辑、创建等操作
-- 不做 chat UX
-- 保持 `sidecar + overlay-api + overlay-web` 架构
+### 当前已经落地的能力
 
-### 当前代码已经实现什么
+#### 治理层
+- `Targets`：目标注册表，支持单目标和 `SIDECAR_TARGETS_FILE` 多目标注册
+- `Risks`：按严重级别、目标、类型聚合的风险视图
+- `Findings`：发现清单，支持下钻到详情
+- `Evidence`：标准化证据清单，支持 path / field 引用
+- `Recommendations`：只读建议检查项，不执行任何动作
 
-#### 1. `apps/sidecar`
-
-只读数据采集层，当前支持两种 adapter 模式：
-
-- `mock`
-  - 默认模式
-  - 支持 `baseline`、`partial-coverage`、`stale-observability`、`error-upstream`
-- `filesystem`
-  - Phase 1.4 新增
-  - 通过本地文件系统只读扫描 OpenClaw 运行目录
-  - 读取配置、工作区、session store、auth profile 等信息
-  - 缺失文件时降级输出 warning 和 `partial/unavailable`，不会写回
-
-当前 sidecar 还会：
-
-- 输出统一 `SystemSnapshot`
-- 输出 collection metadata、freshness、warnings
-- 提供只读 sidecar 路由
-- `x-openclaw-ops-readonly: true`
-
-#### 2. `apps/overlay-api`
-
-只读聚合 API，负责：
-
-- 从 sidecar 读取快照
-- 暴露稳定 REST 接口
-- 增加 overlay-api 自身 runtime status
-- 保持 GET-only
-
-当前接口：
-
-- `GET /health`
-- `GET /api/summary`
-- `GET /api/agents`
-- `GET /api/agents/:id`
-- `GET /api/workspaces`
-- `GET /api/sessions`
-- `GET /api/bindings`
-- `GET /api/auth-profiles`
-- `GET /api/topology`
-- `GET /api/runtime-status`
-
-#### 3. `apps/overlay-web`
-
-独立只读运维界面，当前页面包括：
-
+#### 资源层
 - `Overview`
 - `Agents`
 - `Workspaces`
@@ -71,162 +30,296 @@ OpenClaw Team Ops Console 是一个 **v0.1 alpha**、**独立运行**、**严格
 - `Auth Profiles`
 - `Topology`
 
-当前 UI 已具备：
+#### 数据源层
+- `mock`
+  - 默认模式
+  - 支持 `baseline`、`partial-coverage`、`stale-observability`、`error-upstream`
+- `filesystem`
+  - 只读扫描本地 OpenClaw runtime/config/workspace 路径
+  - 缺失文件时以 `warnings + partial/unavailable + degraded` 方式降级
+- `target registry`
+  - 通过 `SIDECAR_TARGETS_FILE` 注册多个目标
+  - 每个 target 可独立使用 `mock` 或 `filesystem` 数据源
 
-- 表格排序
-- 客户端分页
-- 搜索 / 过滤
-- URL 状态持久化
-- loading / empty / error / retry 状态
-- comfortable / compact 密度切换
+### 当前读取模型（Read Model）
 
-#### 4. `packages/shared`
+OpenClaw Team Ops Console 当前只读观察 OpenClaw 的三类外部状态，不写回、不控制：
 
-共享域模型、DTO 和 builders，统一 sidecar / overlay-api / overlay-web 三层契约。
+| 类别 | 典型来源 | 用途 |
+|---|---|---|
+| Gateway config | `openclaw.json`、`OPENCLAW_CONFIG_PATH` 指向的配置、`$include` 引用文件 | 解析 `agents`、`bindings`、`session.store`、workspace 默认值 |
+| Agent workspace | `workspace*` 下的 Markdown、`memory/`、`skills/` | 展示 bootstrap 文件、workspace 结构、目录健康度、只读预览 |
+| Agent runtime state | `agents/<agentId>/agent/`、`agents/<agentId>/sessions/`、legacy `sessions/` | 展示 auth profiles、sessions、freshness、只读拓扑关系 |
 
-### Phase 1.4 文件系统只读 adapter 当前能力
+### 当前实际读取的文件与目录
 
-当前 `filesystem` adapter 已实现：
+#### A. OpenClaw config
+- `${OPENCLAW_CONFIG_FILE}`
+- `${OPENCLAW_CONFIG_PATH}`
+- `<stateDir>/openclaw.json`
+- `<stateDir>/clawdbot.json`
+- `<stateDir>/moldbot.json`
+- `<stateDir>/moltbot.json`
+- 读取目的：
+  - 解析 `agents.defaults.workspace`
+  - 解析 `agents.list[].id / name / workspace / agentDir`
+  - 解析 `bindings`
+  - 解析 `session.store`
+  - 递归解析 `$include`
 
-- 读取 `OPENCLAW_CONFIG_FILE`，按 JSON5 解析
-- 支持配置文件 `$include`
-- 从配置中解析：
-  - `agents.defaults.workspace`
-  - `agents.list[].workspace`
-  - `agents.list[].id`
-  - `agents.list[].name`
-  - `agents.list[].agentDir`
-  - `bindings`
-- 扫描 `OPENCLAW_WORKSPACE_GLOB`
-- 读取：
-  - `${OPENCLAW_RUNTIME_ROOT}/openclaw.json`
-  - `${OPENCLAW_RUNTIME_ROOT}/agents/<agentId>/agent/auth-profiles.json`
-  - `${OPENCLAW_RUNTIME_ROOT}/agents/<agentId>/sessions/sessions.json`
-- 工作区内会识别常见文件：
-  - `AGENTS.md`
-  - `SOUL.md`
-  - `TOOLS.md`
-  - `BOOTSTRAP.md`
-  - `IDENTITY.md`
-  - `USER.md`
-  - `HEARTBEAT.md`
-  - `MEMORY.md`
-  - `memory.md`
-  - `memory/`
-  - `skills/`
+#### B. Agent runtime state
+- `<stateDir>/agents/<agentId>/agent/auth-profiles.json`
+  - 用于只读展示 auth profile 数量、provider、状态摘要
+- `<stateDir>/agents/<agentId>/sessions/sessions.json`
+  - 用于只读展示 session 列表、活跃时间、归属 agent、freshness
+- `<stateDir>/sessions/sessions.json`
+  - 当前版本只用于官方文档中 main/default agent 的 legacy 兼容回退
+- `<stateDir>/agents/<agentId>/sessions/*.jsonl`
+  - 当前版本**不读取 transcript 内容**
+  - 当前只使用 `sessions.json` 元数据，不做 transcript 级浏览
 
-### 当前 adapter 切换规则
-
-代码当前并 **没有** 使用 `SIDECAR_SOURCE` 作为实际开关。
-
-当前真实生效的规则是：
-
-- 如果没有设置以下任一变量，则使用 `mock`
-  - `OPENCLAW_RUNTIME_ROOT`
-  - `OPENCLAW_CONFIG_FILE`
-  - `OPENCLAW_WORKSPACE_GLOB`
-- 只要设置了以上任一变量，就会启用 `filesystem` adapter
-- `OPENCLAW_SOURCE_ROOT` 仅用于展示 source metadata，不单独触发 adapter 切换
-
-### 你提供的 `.env` 参考，与当前代码对照
-
-#### 当前代码已经实际读取的变量
-
-- `SIDECAR_PORT`
-- `OVERLAY_API_PORT`
-- `VITE_OVERLAY_API_URL`
-- `SIDECAR_MOCK_SCENARIO`
-- `OPENCLAW_RUNTIME_ROOT`
-- `OPENCLAW_CONFIG_FILE`
-- `OPENCLAW_WORKSPACE_GLOB`
-- `OPENCLAW_SOURCE_ROOT`
-
-#### 当前代码中尚未接线、仅可视为预留的变量
-
-- `SIDECAR_SOURCE`
-- `OPENCLAW_GATEWAY_URL`
-- `OPENCLAW_DASHBOARD_URL`
-- `OPENCLAW_LOG_GLOB`
-
-也就是说，你这份 `.env` 可以作为本地参考，但上面 4 个“预留变量”当前不会改变运行行为。
-
-### 推荐 `.env` 示例
-
-```env
-SIDECAR_PORT=4310
-OVERLAY_API_PORT=4300
-VITE_OVERLAY_API_URL=http://localhost:4300
-
-# 默认仍可保留 mock
-SIDECAR_MOCK_SCENARIO=baseline
-
-# Phase 1.4 本地只读 filesystem adapter
-OPENCLAW_RUNTIME_ROOT=/home/zhangsy/.openclaw
-OPENCLAW_CONFIG_FILE=/home/zhangsy/.openclaw/openclaw.json
-OPENCLAW_WORKSPACE_GLOB=/home/zhangsy/.openclaw/workspace*
-OPENCLAW_SOURCE_ROOT=/home/zhangsy/code/openclaw
-```
-
-### 其他当前已支持的运行变量
-
-- `SIDECAR_BASE_URL`
-  - overlay-api 访问 sidecar 的上游地址
-  - 默认：`http://localhost:4310`
-- `SIDECAR_TIMEOUT_MS`
-  - overlay-api 请求 sidecar 的超时时间
-  - 默认：`5000`
-- `OVERLAY_WEB_PORT`
-  - 本地开发时 overlay-web 端口
-  - 默认：`5173`
-- `OVERLAY_API_PROXY_TARGET`
-  - Vite 开发代理目标
-  - 默认：`http://localhost:4300`
-- `HOST_SIDECAR_PORT`
-- `HOST_OVERLAY_API_PORT`
-- `HOST_OVERLAY_WEB_PORT`
-  - 以上 3 个主要用于 Docker Compose 对外暴露端口
+#### C. Agent workspace
+- `${workspace}/AGENTS.md`
+- `${workspace}/SOUL.md`
+- `${workspace}/TOOLS.md`
+- `${workspace}/BOOTSTRAP.md`
+- `${workspace}/BOOT.md`
+- `${workspace}/IDENTITY.md`
+- `${workspace}/USER.md`
+- `${workspace}/HEARTBEAT.md`
+- `${workspace}/MEMORY.md`
+- `${workspace}/memory.md`
+- `${workspace}/memory/`
+- `${workspace}/skills/`
 
 说明：
 
-- 如果不设置 `VITE_OVERLAY_API_URL`，前端默认走同源 `/api` 与 `/health`
-- 如果设置为 `http://localhost:4300`，前端会直接请求 overlay-api
+- 所有读取均为只读扫描，不创建、不修改、不删除任何文件
+- 缺失文件显示为 `partial` / `warning` / `degraded`，不会自动补齐
+- `OPENCLAW_SOURCE_ROOT` 仅用于展示来源元信息，不会 import 或执行 OpenClaw 源码
 
-### 本地启动
+### 菜单功能与代码透明
 
-#### 默认 mock 模式
+| 菜单 | 读取对象 | 主要展示 | 明确不做 |
+|---|---|---|---|
+| Overview | summary snapshot | 整体健康度、计数、warnings、freshness | 不做控制台写操作 |
+| Targets | target registry + snapshot summary | target 列表、source、env、freshness、coverage、risk score | 不编辑 target，不发起控制 |
+| Risks | findings 聚合视图 | 风险总览、严重级别、目标聚合 | 不自动修复 |
+| Findings | evidence + derived rules | 风险结论、影响范围、建议检查项 | 不下发治理动作 |
+| Evidence | warnings + collection metadata + derived evidence | 路径引用、字段引用、观测时间、source | 不修改任何源文件 |
+| Agents | config + runtime | agent 列表、workspace、auth、session 汇总 | 不创建/删除 agent |
+| Workspaces | workspace files | bootstrap 文件、memory/skills 目录、只读预览 | 不编辑任何 Markdown |
+| Sessions | `sessions.json` metadata | session 列表、活跃时间、归属 agent、freshness | 不 reset / prune / send |
+| Bindings | config bindings | 渠道与 agent 的绑定关系 | 不 bind / unbind |
+| Auth Profiles | `auth-profiles.json` | profile 数量、provider、状态摘要 | 不登录、不刷新 token |
+| Topology | 聚合 snapshot | config / workspace / sessions / bindings 的关系图 | 不调度、不路由 |
+
+### 代码透明与非目标
+
+OpenClaw Team Ops Console 的目标是“外部只读观察”，不是“第二个 Gateway”。
+
+#### 本项目明确会做的事
+- 只读扫描 OpenClaw 外部状态
+- 聚合成稳定的 `SystemSnapshot`
+- 通过 GET-only API 和只读 Web UI 展示
+- 对缺失、陈旧、不一致状态输出 `warning`、`partial`、`freshness`
+
+#### 本项目明确不会做的事
+- 不修改 OpenClaw core
+- 不 import OpenClaw 内部源码模块
+- 不写回 `openclaw.json`
+- 不写回 workspace Markdown
+- 不写回 `auth-profiles.json`
+- 不写回 `sessions.json`
+- 不执行 `bind / unbind / create / delete / stop / restart`
+- 不作为 chat UI，不替代 official dashboard
+- 不 patch / fork / vendor / runtime injection
+
+### 为什么是 Governance，不是 Control
+
+本仓库关注的是：
+
+- 哪些 target 存在风险
+- 风险来自哪些证据
+- 哪些数据不完整、已过期、或存在解析异常
+- 人应该去检查什么
+
+本仓库**不做**：
+
+- 写本地文件
+- 调 OpenClaw 写接口
+- 终止会话 / 重启 agent / 应用配置
+- chat UX、prompt 编辑、执行控制
+- patch / fork / vendor / runtime injection
+
+### 架构概览
+
+```text
+OpenClaw runtime or mock data
+        |
+        v
+     sidecar
+        |
+        v
+    overlay-api
+        |
+        v
+    overlay-web
+```
+
+### 快速启动
 
 ```bash
 corepack pnpm install
+cp .env.example .env
 corepack pnpm dev
 ```
 
-#### 本地 OpenClaw 文件系统只读模式
-
-```bash
-OPENCLAW_RUNTIME_ROOT=/home/zhangsy/.openclaw \
-OPENCLAW_CONFIG_FILE=/home/zhangsy/.openclaw/openclaw.json \
-OPENCLAW_WORKSPACE_GLOB='/home/zhangsy/.openclaw/workspace*' \
-OPENCLAW_SOURCE_ROOT=/home/zhangsy/code/openclaw \
-corepack pnpm dev
-```
-
-本地地址：
+默认本地地址：
 
 - Overlay Web: `http://localhost:5173`
 - Overlay API: `http://localhost:4300`
 - Sidecar: `http://localhost:4310`
 
-### Docker 启动
+如果你想把前端改到 `9527`，可在 `.env` 中设置：
 
-```bash
-docker compose up --build
+```env
+OVERLAY_WEB_PORT=9527
+HOST_OVERLAY_WEB_PORT=9527
 ```
+
+### 默认模式与切换规则
+
+#### 1. 默认 mock 模式
+
+在没有配置本地 OpenClaw 路径时，sidecar 默认使用 `mock`。
+
+#### 2. filesystem 只读模式
+
+当以下任一变量被设置时，sidecar 会切到 `filesystem` adapter：
+
+- `OPENCLAW_RUNTIME_ROOT`
+- `OPENCLAW_STATE_DIR`
+- `OPENCLAW_CONFIG_FILE`
+- `OPENCLAW_CONFIG_PATH`
+- `OPENCLAW_WORKSPACE_GLOB`
+- `OPENCLAW_PROFILE`
 
 说明：
 
-- 当前 compose 默认仍是 mock-first
-- 没有默认挂载本地 OpenClaw runtime 目录
-- 如果要走本地 filesystem adapter，当前更适合 process mode
+- 状态目录解析顺序：
+  `OPENCLAW_RUNTIME_ROOT -> OPENCLAW_STATE_DIR -> profile 默认值`
+- profile 默认状态目录：
+  非 `default` 时为 `~/.openclaw-<profile>`，否则为 `~/.openclaw`
+- 配置文件解析顺序：
+  `OPENCLAW_CONFIG_FILE -> OPENCLAW_CONFIG_PATH -> 状态目录下已存在配置 -> <stateDir>/openclaw.json`
+- workspace 解析顺序：
+  `OPENCLAW_WORKSPACE_GLOB -> ~/.openclaw/workspace*`
+- session store 解析顺序：
+  `session.store -> <stateDir>/agents/<agentId>/sessions/sessions.json -> <stateDir>/sessions/sessions.json（仅 main/default agent 兼容回退）`
+- `OPENCLAW_SOURCE_ROOT` 仅用于展示 source metadata
+- `SIDECAR_SOURCE` 目前仍不是实际生效的切换开关
+
+#### 3. 多 target 注册表
+
+当 `SIDECAR_TARGETS_FILE` 被设置时，sidecar 会从目标注册表文件中读取多个 target。
+
+示例文件见：[examples/targets.registry.example.json](examples/targets.registry.example.json)
+
+### 常用环境变量
+
+#### sidecar
+- `SIDECAR_PORT`
+- `SIDECAR_MOCK_SCENARIO`
+- `SIDECAR_TARGET_ID`
+- `SIDECAR_TARGET_NAME`
+- `SIDECAR_TARGET_ENVIRONMENT`
+- `SIDECAR_TARGET_OWNER`
+- `SIDECAR_TARGETS_FILE`
+- `OPENCLAW_RUNTIME_ROOT`
+- `OPENCLAW_STATE_DIR`
+- `OPENCLAW_CONFIG_FILE`
+- `OPENCLAW_CONFIG_PATH`
+- `OPENCLAW_WORKSPACE_GLOB`
+- `OPENCLAW_PROFILE`
+- `OPENCLAW_SOURCE_ROOT`
+- `OPENCLAW_GATEWAY_URL`（当前仅用于元信息展示）
+- `OPENCLAW_DASHBOARD_URL`（当前仅用于元信息展示）
+- `OPENCLAW_LOG_GLOB`（当前预留，未接线）
+
+#### overlay-api
+- `OVERLAY_API_PORT`
+- `SIDECAR_BASE_URL`
+- `SIDECAR_TIMEOUT_MS`
+
+#### overlay-web
+- `OVERLAY_WEB_PORT`
+- `OVERLAY_API_PROXY_TARGET`
+- `VITE_OVERLAY_API_URL`
+- `HOST_SIDECAR_PORT`
+- `HOST_OVERLAY_API_PORT`
+- `HOST_OVERLAY_WEB_PORT`
+
+### 当前主要页面
+
+- `/`
+- `/targets`
+- `/targets/:id`
+- `/risks`
+- `/findings`
+- `/findings/:id`
+- `/evidence`
+- `/evidence/:id`
+- `/agents`
+- `/workspaces`
+- `/sessions`
+- `/bindings`
+- `/auth-profiles`
+- `/topology`
+
+### 当前主要只读 API
+
+- `GET /health`
+- `GET /api/summary`
+- `GET /api/targets`
+- `GET /api/targets/:id`
+- `GET /api/targets/:id/summary`
+- `GET /api/evidence`
+- `GET /api/evidence/:id`
+- `GET /api/findings`
+- `GET /api/findings/:id`
+- `GET /api/recommendations`
+- `GET /api/recommendations/:id`
+- `GET /api/risks/summary`
+- `GET /api/agents`
+- `GET /api/agents/:id`
+- `GET /api/workspaces`
+- `GET /api/workspaces/:id/documents/:fileName`
+- `GET /api/sessions`
+- `GET /api/bindings`
+- `GET /api/auth-profiles`
+- `GET /api/topology`
+- `GET /api/runtime-status`
+
+### v0.2 scope
+
+v0.2 当前聚焦：
+
+- Target Registry
+- Evidence / Findings / Risks 治理链路
+- Recommendation 建议式运维
+- 多目标只读观察
+- 保持 mock + filesystem 两类基础模式
+
+### non-goals
+
+- 不做真实写操作
+- 不做业务型 `POST / PUT / PATCH / DELETE`
+- 不做 chat 前端
+- 不做审批流
+- 不做 RBAC 落地
+- 不做远程执行
+- 不通过前端或 sidecar 写本地文件
 
 ### 质量检查
 
@@ -234,84 +327,62 @@ docker compose up --build
 corepack pnpm guard:readonly
 corepack pnpm typecheck
 corepack pnpm test
+corepack pnpm playwright:install
+corepack pnpm test:e2e
 corepack pnpm build
 corepack pnpm check
 ```
 
-### 当前版本限制
+### 文档索引
 
-- 仍然是 v0.1 alpha
-- 仍然严格只读
-- 默认仍然是 mock-first
-- 真实 adapter 目前只有本地 filesystem adapter
-- 还没有接入真实 gateway HTTP / dashboard / log / CLI adapter
-- 没有 RBAC
-- 没有实时事件总线
-- 没有 chat、prompt 编辑、执行控制、写回功能
+- [docs/architecture.md](docs/architecture.md)
+- [docs/api-contract.md](docs/api-contract.md)
+- [docs/deployment-local.md](docs/deployment-local.md)
+- [docs/local-path-integration.md](docs/local-path-integration.md)
+- [docs/mock-scenarios.md](docs/mock-scenarios.md)
+- [docs/roadmap-v0.2.md](docs/roadmap-v0.2.md)
+- [docs/why-governance-not-control.md](docs/why-governance-not-control.md)
+- [docs/v0.2-changelog.md](docs/v0.2-changelog.md)
+- [docs/v0.2-api-examples.md](docs/v0.2-api-examples.md)
+- [docs/v0.2-demo-scenarios.md](docs/v0.2-demo-scenarios.md)
+- [docs/v0.2-known-limitations.md](docs/v0.2-known-limitations.md)
+- [docs/v0.2-information-architecture.md](docs/v0.2-information-architecture.md)
+- [docs/v0.2-governance-flow.md](docs/v0.2-governance-flow.md)
+- [docs/v0.2-dto-changes.md](docs/v0.2-dto-changes.md)
+- [docs/v0.2-api-changes.md](docs/v0.2-api-changes.md)
+- [docs/v0.2-validation-log.md](docs/v0.2-validation-log.md)
+- [docs/v0.2-acceptance-checklist.md](docs/v0.2-acceptance-checklist.md)
+
+### 已知限制
+
+- 当前仍是内部 alpha / preview 形态
+- `filesystem` 是唯一真实 adapter
+- `gateway / dashboard / logs / cli` 仍未接真实采集
+- 当前只落地了 1 条最小浏览器级 E2E，用于验证只读治理主链路
+- 页面截图交付物仍需单独补充
 
 ---
 
 ## English
 
-OpenClaw Team Ops Console is a **v0.1 alpha**, **standalone**, **strictly read-only**, **mock-first by default** operations console for external visibility into OpenClaw multi-agent environments.
+OpenClaw Team Ops Console currently ships as a **v0.2 governance preview** for internal evaluation:
 
-The repository keeps a hard external-system boundary:
+- standalone, with no OpenClaw core changes required
+- strictly read-only
+- mock-first by default
+- still built as `sidecar + overlay-api + overlay-web`
+- moving from an inventory console toward a governance and visibility console
 
-- no OpenClaw core changes
-- no OpenClaw source imports
-- no patch / fork / vendor
-- no write-back or control actions
-- no chat UX
-- architecture remains `sidecar + overlay-api + overlay-web`
+### What is implemented today
 
-### What the code currently implements
+#### Governance layer
+- `Targets` for target registry and fleet visibility
+- `Risks` for aggregated governance signals
+- `Findings` for detailed issue review and drill-down
+- `Evidence` for normalized, traceable evidence records
+- `Recommendations` as read-only suggested checks
 
-#### 1. `apps/sidecar`
-
-Read-only source collection layer with two adapter modes:
-
-- `mock`
-  - default mode
-  - supports `baseline`, `partial-coverage`, `stale-observability`, `error-upstream`
-- `filesystem`
-  - added in Phase 1.4
-  - reads local OpenClaw runtime paths from the filesystem in read-only mode
-  - collects config, workspaces, sessions, auth profiles, and runtime summary data
-  - degrades with warnings and `partial/unavailable` metadata when files are missing
-
-The sidecar currently:
-
-- emits normalized `SystemSnapshot`
-- includes collection metadata, freshness, and warnings
-- exposes read-only sidecar routes
-- sets `x-openclaw-ops-readonly: true`
-
-#### 2. `apps/overlay-api`
-
-Read-only aggregation API that:
-
-- reads snapshots from sidecar
-- exposes stable REST endpoints
-- appends overlay-api runtime status
-- remains GET-only
-
-Current endpoints:
-
-- `GET /health`
-- `GET /api/summary`
-- `GET /api/agents`
-- `GET /api/agents/:id`
-- `GET /api/workspaces`
-- `GET /api/sessions`
-- `GET /api/bindings`
-- `GET /api/auth-profiles`
-- `GET /api/topology`
-- `GET /api/runtime-status`
-
-#### 3. `apps/overlay-web`
-
-Standalone read-only ops UI with these routes:
-
+#### Resource layer
 - `Overview`
 - `Agents`
 - `Workspaces`
@@ -320,180 +391,201 @@ Standalone read-only ops UI with these routes:
 - `Auth Profiles`
 - `Topology`
 
-Current UX capabilities:
+#### Source layer
+- `mock` remains the default mode
+- `filesystem` reads local OpenClaw runtime paths in read-only mode
+- `SIDECAR_TARGETS_FILE` enables multiple registered targets, each with its own source configuration
 
-- table sorting
-- client-side pagination
-- search / filtering
-- URL-persisted state
-- loading / empty / error / retry states
-- comfortable / compact density modes
+### Current Read Model
 
-#### 4. `packages/shared`
+OpenClaw Team Ops Console reads three classes of external OpenClaw state in read-only mode. It does not write back or control the runtime:
 
-Shared domain models, DTOs, and builders used consistently across sidecar, overlay-api, and overlay-web.
+| Category | Typical sources | Purpose |
+|---|---|---|
+| Gateway config | `openclaw.json`, the path from `OPENCLAW_CONFIG_PATH`, and `$include` references | Parse `agents`, `bindings`, `session.store`, and workspace defaults |
+| Agent workspace | Markdown files plus `memory/` and `skills/` under `workspace*` directories | Show bootstrap coverage, workspace structure, health posture, and read-only previews |
+| Agent runtime state | `agents/<agentId>/agent/`, `agents/<agentId>/sessions/`, and legacy `sessions/` | Show auth profiles, sessions, freshness, and read-only topology relationships |
 
-### Current Phase 1.4 filesystem adapter capabilities
+### Files And Directories Currently Read
 
-The current `filesystem` adapter already supports:
+#### A. OpenClaw config
+- `${OPENCLAW_CONFIG_FILE}`
+- `${OPENCLAW_CONFIG_PATH}`
+- `<stateDir>/openclaw.json`
+- `<stateDir>/clawdbot.json`
+- `<stateDir>/moldbot.json`
+- `<stateDir>/moltbot.json`
+- Read purposes:
+  - parse `agents.defaults.workspace`
+  - parse `agents.list[].id / name / workspace / agentDir`
+  - parse `bindings`
+  - parse `session.store`
+  - recursively resolve `$include`
 
-- reading `OPENCLAW_CONFIG_FILE` as JSON5
-- supporting config `$include`
-- parsing config fields such as:
-  - `agents.defaults.workspace`
-  - `agents.list[].workspace`
-  - `agents.list[].id`
-  - `agents.list[].name`
-  - `agents.list[].agentDir`
-  - `bindings`
-- scanning `OPENCLAW_WORKSPACE_GLOB`
-- reading:
-  - `${OPENCLAW_RUNTIME_ROOT}/openclaw.json`
-  - `${OPENCLAW_RUNTIME_ROOT}/agents/<agentId>/agent/auth-profiles.json`
-  - `${OPENCLAW_RUNTIME_ROOT}/agents/<agentId>/sessions/sessions.json`
-- checking common workspace files:
-  - `AGENTS.md`
-  - `SOUL.md`
-  - `TOOLS.md`
-  - `BOOTSTRAP.md`
-  - `IDENTITY.md`
-  - `USER.md`
-  - `HEARTBEAT.md`
-  - `MEMORY.md`
-  - `memory.md`
-  - `memory/`
-  - `skills/`
+#### B. Agent runtime state
+- `<stateDir>/agents/<agentId>/agent/auth-profiles.json`
+  - used for read-only auth-profile counts, provider hints, and status summaries
+- `<stateDir>/agents/<agentId>/sessions/sessions.json`
+  - used for read-only session inventory, activity times, agent ownership, and freshness
+- `<stateDir>/sessions/sessions.json`
+  - currently used only as the documented legacy fallback for the main/default agent
+- `<stateDir>/agents/<agentId>/sessions/*.jsonl`
+  - the current version does **not** read transcript contents
+  - this release only uses `sessions.json` metadata
 
-### Actual adapter selection behavior
-
-The current code does **not** use `SIDECAR_SOURCE` as a live switch.
-
-The real behavior today is:
-
-- if none of these are set, sidecar stays in `mock` mode:
-  - `OPENCLAW_RUNTIME_ROOT`
-  - `OPENCLAW_CONFIG_FILE`
-  - `OPENCLAW_WORKSPACE_GLOB`
-- if any of them is set, sidecar switches to the `filesystem` adapter
-- `OPENCLAW_SOURCE_ROOT` is informational only and does not activate filesystem mode by itself
-
-### Your `.env` reference vs current code
-
-#### Variables that are already wired and used today
-
-- `SIDECAR_PORT`
-- `OVERLAY_API_PORT`
-- `VITE_OVERLAY_API_URL`
-- `SIDECAR_MOCK_SCENARIO`
-- `OPENCLAW_RUNTIME_ROOT`
-- `OPENCLAW_CONFIG_FILE`
-- `OPENCLAW_WORKSPACE_GLOB`
-- `OPENCLAW_SOURCE_ROOT`
-
-#### Variables that are currently only reserved and not wired yet
-
-- `SIDECAR_SOURCE`
-- `OPENCLAW_GATEWAY_URL`
-- `OPENCLAW_DASHBOARD_URL`
-- `OPENCLAW_LOG_GLOB`
-
-So your `.env` is a good operator reference, but those four reserved variables do not change runtime behavior yet.
-
-### Recommended `.env`
-
-```env
-SIDECAR_PORT=4310
-OVERLAY_API_PORT=4300
-VITE_OVERLAY_API_URL=http://localhost:4300
-
-# Keep mock as the default fallback
-SIDECAR_MOCK_SCENARIO=baseline
-
-# Phase 1.4 local read-only filesystem adapter
-OPENCLAW_RUNTIME_ROOT=/home/zhangsy/.openclaw
-OPENCLAW_CONFIG_FILE=/home/zhangsy/.openclaw/openclaw.json
-OPENCLAW_WORKSPACE_GLOB=/home/zhangsy/.openclaw/workspace*
-OPENCLAW_SOURCE_ROOT=/home/zhangsy/code/openclaw
-```
-
-### Other currently supported runtime variables
-
-- `SIDECAR_BASE_URL`
-  - upstream sidecar URL used by overlay-api
-  - default: `http://localhost:4310`
-- `SIDECAR_TIMEOUT_MS`
-  - sidecar read timeout used by overlay-api
-  - default: `5000`
-- `OVERLAY_WEB_PORT`
-  - overlay-web local dev port
-  - default: `5173`
-- `OVERLAY_API_PROXY_TARGET`
-  - Vite development proxy target
-  - default: `http://localhost:4300`
-- `HOST_SIDECAR_PORT`
-- `HOST_OVERLAY_API_PORT`
-- `HOST_OVERLAY_WEB_PORT`
-  - mainly used for Docker Compose published ports
+#### C. Agent workspace
+- `${workspace}/AGENTS.md`
+- `${workspace}/SOUL.md`
+- `${workspace}/TOOLS.md`
+- `${workspace}/BOOTSTRAP.md`
+- `${workspace}/BOOT.md`
+- `${workspace}/IDENTITY.md`
+- `${workspace}/USER.md`
+- `${workspace}/HEARTBEAT.md`
+- `${workspace}/MEMORY.md`
+- `${workspace}/memory.md`
+- `${workspace}/memory/`
+- `${workspace}/skills/`
 
 Notes:
 
-- if `VITE_OVERLAY_API_URL` is unset, the web app uses same-origin `/api` and `/health`
-- if it is set to `http://localhost:4300`, the browser calls overlay-api directly
+- all reads are read-only scans; no files are created, modified, or deleted
+- missing files surface as `partial`, `warning`, or `degraded`; they are never auto-healed
+- `OPENCLAW_SOURCE_ROOT` is informational metadata only and is never imported or executed
 
-### Local startup
+### Menu Transparency
 
-#### Default mock mode
+| Menu | Reads | Main display | Explicitly does not do |
+|---|---|---|---|
+| Overview | summary snapshot | fleet health, counts, warnings, freshness | no control-plane writes |
+| Targets | target registry + snapshot summary | targets, source, environment, freshness, coverage, risk score | no target editing or control actions |
+| Risks | aggregated findings | risk overview, severity, target grouping | no auto-remediation |
+| Findings | evidence + derived rules | governance conclusions, impact, recommended checks | no downstream governance action |
+| Evidence | warnings + collection metadata + derived evidence | path refs, field refs, observed times, source metadata | no source mutation |
+| Agents | config + runtime | agent inventory, workspace, auth, and session rollups | no agent create/delete |
+| Workspaces | workspace files | bootstrap files, memory/skills directories, read-only preview | no Markdown editing |
+| Sessions | `sessions.json` metadata | sessions, activity time, owning agent, freshness | no reset / prune / send |
+| Bindings | config bindings | channel-to-agent routing relationships | no bind / unbind |
+| Auth Profiles | `auth-profiles.json` | profile counts, provider hints, status summaries | no login or token refresh |
+| Topology | aggregated snapshot | relationships across config, workspaces, sessions, and bindings | no scheduling or routing |
+
+### Transparency And Non-goals
+
+OpenClaw Team Ops Console is meant to be an external read-only observer, not a second Gateway.
+
+#### This project explicitly does
+- read external OpenClaw state in read-only mode
+- normalize that state into a stable `SystemSnapshot`
+- expose it through GET-only APIs and a read-only web UI
+- surface missing, stale, or inconsistent state as `warning`, `partial`, and freshness metadata
+
+#### This project explicitly does not do
+- modify OpenClaw core
+- import internal OpenClaw source modules
+- write back `openclaw.json`
+- write back workspace Markdown
+- write back `auth-profiles.json`
+- write back `sessions.json`
+- execute `bind / unbind / create / delete / stop / restart`
+- act as a chat UI or replace the official dashboard
+- patch, fork, vendor, or inject into the OpenClaw runtime
+
+### Why governance, not control
+
+This repository is designed to answer:
+
+- which targets look risky
+- what evidence supports that judgment
+- where data is partial, stale, or unavailable
+- what an operator should inspect next
+
+This repository does **not**:
+
+- mutate OpenClaw state
+- expose write-oriented endpoints
+- provide chat UX or execution control
+- patch, fork, vendor, or inject into OpenClaw runtime
+
+### Quickstart
 
 ```bash
 corepack pnpm install
+cp .env.example .env
 corepack pnpm dev
 ```
 
-#### Local OpenClaw filesystem read-only mode
-
-```bash
-OPENCLAW_RUNTIME_ROOT=/home/zhangsy/.openclaw \
-OPENCLAW_CONFIG_FILE=/home/zhangsy/.openclaw/openclaw.json \
-OPENCLAW_WORKSPACE_GLOB='/home/zhangsy/.openclaw/workspace*' \
-OPENCLAW_SOURCE_ROOT=/home/zhangsy/code/openclaw \
-corepack pnpm dev
-```
-
-Local URLs:
+Default local URLs:
 
 - Overlay Web: `http://localhost:5173`
 - Overlay API: `http://localhost:4300`
 - Sidecar: `http://localhost:4310`
 
-### Docker startup
+### Mode selection
+
+- no local runtime paths configured -> `mock`
+- any of `OPENCLAW_RUNTIME_ROOT`, `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_FILE`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_WORKSPACE_GLOB`, or `OPENCLAW_PROFILE` configured -> `filesystem`
+- `SIDECAR_TARGETS_FILE` configured -> target registry mode with one or more targets
+
+`OPENCLAW_SOURCE_ROOT` is informational only. `SIDECAR_SOURCE` is still not the live adapter switch.
+
+Filesystem resolution order:
+
+- state dir: `OPENCLAW_RUNTIME_ROOT -> OPENCLAW_STATE_DIR -> ~/.openclaw-<profile> -> ~/.openclaw`
+- config: `OPENCLAW_CONFIG_FILE -> OPENCLAW_CONFIG_PATH -> existing config candidate in the state dir -> <stateDir>/openclaw.json`
+- workspaces: `OPENCLAW_WORKSPACE_GLOB -> ~/.openclaw/workspace*`
+- sessions: `session.store -> agents/<agentId>/sessions/sessions.json -> sessions/sessions.json` for the main/default agent legacy fallback
+
+### Local filesystem example
 
 ```bash
-docker compose up --build
+OPENCLAW_STATE_DIR=/home/your-user/.openclaw \
+OPENCLAW_CONFIG_PATH=/home/your-user/.openclaw/openclaw.json \
+OPENCLAW_WORKSPACE_GLOB='/home/your-user/.openclaw/workspace*' \
+OPENCLAW_PROFILE=default \
+OPENCLAW_SOURCE_ROOT=/home/your-user/code/openclaw \
+corepack pnpm dev
 ```
 
-Notes:
-
-- compose remains mock-first by default
-- it does not mount a local OpenClaw runtime directory by default
-- for filesystem adapter usage, process mode is currently the better path
-
-### Quality checks
+### Quality gates
 
 ```bash
-corepack pnpm guard:readonly
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
+corepack pnpm playwright:install
+corepack pnpm test:e2e
 corepack pnpm check
 ```
 
-### Current limitations
+### Browser E2E
 
-- still v0.1 alpha
-- still strictly read-only
-- still mock-first by default
-- the only real adapter currently implemented is the local filesystem adapter
-- real gateway HTTP / dashboard / log / CLI adapters are not wired yet
-- no RBAC
-- no real-time event bus
-- no chat, prompt editing, execution control, or write-back features
+The repository now includes one minimal browser-level E2E that validates the read-only governance flow with the `partial-coverage` mock fixture:
+
+`Risks -> Finding Detail -> Evidence -> Recommendation`
+
+It asserts:
+
+- key page text is present
+- evidence records are present
+- recommendations are present
+- the flow remains read-only
+
+Current test name:
+
+- `browser e2e: mock governance flow stays read-only from risks to finding detail, evidence, and recommendations`
+
+On Linux/WSL, `corepack pnpm test:e2e` automatically prepares a small local library bundle for Playwright Chromium when system libraries are missing.
+
+### Current non-goals
+
+- write operations
+- business `POST / PUT / PATCH / DELETE`
+- chat UX
+- remote execution
+- RBAC rollout
+- approval workflows
+
+### Known limitations
+
+- internal alpha / preview only
+- filesystem is the only real adapter today
+- only one minimal browser-level E2E is in place today
+- browser-level screenshots are still pending
+- gateway, dashboard, log, and CLI adapters are not implemented yet, but `openclaw gateway status --json`, `openclaw health --json`, and allowlisted read-only `openclaw gateway call ...` surfaces are confirmed external inputs

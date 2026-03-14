@@ -1,0 +1,57 @@
+{
+  "data": [
+    {
+      "id": "ev-include-01",
+      "targetId": "local-runtime-dev",
+      "targetName": "Local Runtime Dev",
+      "kind": "config-include",
+      "source": "filesystem",
+      "subjectType": "target",
+      "subjectId": "local-runtime-dev",
+      "subjectLabel": "Local Runtime Dev",
+      "severity": "error",
+      "message": "Included config file could not be resolved.",
+      "details": {
+        "code": "CONFIG_INCLUDE_MISSING",
+        "collection": "bindings",
+        "sourceId": "openclaw-config-file"
+      },
+      "observedAt": "2026-03-14T10:19:40.000Z",
+      "freshness": "stale",
+      "pathRefs": [
+        "/home/example/.openclaw/openclaw.json",
+        "/home/example/.openclaw/includes/bindings.json5"
+      ],
+      "fieldRefs": ["bindings"]
+    },
+    {
+      "id": "ev-workspace-01",
+      "targetId": "local-runtime-dev",
+      "targetName": "Local Runtime Dev",
+      "kind": "workspace-scan",
+      "source": "filesystem",
+      "subjectType": "workspace",
+      "subjectId": "workspace-marketing",
+      "subjectLabel": "workspace-marketing",
+      "severity": "warn",
+      "message": "Workspace scan found missing core markdown files.",
+      "details": {
+        "code": "OPENCLAW_WORKSPACE_DIRECTORY_MISSING",
+        "collection": "workspaces",
+        "sourceId": "openclaw-workspace-scan"
+      },
+      "observedAt": "2026-03-14T10:19:42.000Z",
+      "freshness": "fresh",
+      "pathRefs": [
+        "/home/example/.openclaw/workspace-marketing"
+      ],
+      "fieldRefs": ["AGENTS.md", "SOUL.md", "TOOLS.md"]
+    }
+  ],
+  "meta": {
+    "generatedAt": "2026-03-14T10:20:00.000Z",
+    "source": "mixed",
+    "readOnly": true,
+    "count": 2
+  }
+}

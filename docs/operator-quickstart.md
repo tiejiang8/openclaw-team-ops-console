@@ -1,15 +1,16 @@
 # Operator Quickstart
 
-This quickstart is for internal evaluators who want to run the alpha package quickly and verify the current read-only scope.
+This quickstart is for internal evaluators who want to run the governance preview quickly and verify the current read-only scope.
 
-## What You Are Starting
+## What you are starting
 
 - standalone sidecar product
-- read-only operations console
+- read-only governance and visibility console
 - mock-backed by default
-- no OpenClaw core modifications required
+- optional local filesystem adapter
+- optional multi-target registry
 
-## Fastest Local Path
+## Fastest local path
 
 1. Install dependencies
 
@@ -33,7 +34,7 @@ corepack pnpm dev
 
 - `http://localhost:5173`
 
-## Fastest Container Path
+## Fastest container path
 
 ```bash
 docker compose up --build
@@ -43,14 +44,16 @@ Then open:
 
 - `http://localhost:5173`
 
-## Recommended Reviewer Path
+## Recommended reviewer path
 
-1. Verify Overview loads and shows summary cards
-2. Review `Agents`, `Workspaces`, `Sessions`, `Bindings`, `Auth Profiles`, and `Topology`
-3. Confirm no write controls are present
-4. Switch to `partial-coverage` or `stale-observability` and confirm degraded states remain readable
+1. Verify `Overview` loads and shows fleet-level cards
+2. Open `Targets` and confirm target metadata and coverage
+3. Open `Risks` and drill into a finding
+4. From `Finding Detail`, open evidence and recommendations
+5. From `Evidence Detail`, jump to the related resource
+6. Confirm no write controls are present anywhere
 
-## Useful Commands
+## Useful commands
 
 Validation:
 
@@ -70,19 +73,20 @@ Container logs:
 docker compose logs -f
 ```
 
-## Mock Scenario Examples
+## Mock scenario examples
 
 ```bash
 SIDECAR_MOCK_SCENARIO=baseline corepack pnpm dev
 SIDECAR_MOCK_SCENARIO=partial-coverage corepack pnpm dev
 SIDECAR_MOCK_SCENARIO=stale-observability corepack pnpm dev
+SIDECAR_MOCK_SCENARIO=error-upstream corepack pnpm dev
 ```
 
-## Read-only Reminder
+## Read-only reminder
 
-This alpha does not implement:
+This preview does not implement:
 
 - create, update, delete, restart, terminate, or apply actions
-- real OpenClaw adapter logic
+- remote execution
 - auth or RBAC flows
 - chat, prompt editing, or execution control surfaces

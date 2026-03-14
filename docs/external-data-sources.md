@@ -6,7 +6,7 @@ Phase 1.4 implements the local filesystem/runtime source path described below. M
 
 ## Confirmed External Read-only Sources
 
-These sources are documented in the sibling OpenClaw repo and are appropriate candidates for future external adapters.
+These sources are documented in the sibling OpenClaw repo and are confirmed external surfaces for this console. Some are already implemented today; others are confirmed and implementation-ready but not wired yet.
 
 ### CLI diagnostics and status
 
@@ -16,11 +16,39 @@ These sources are documented in the sibling OpenClaw repo and are appropriate ca
 - `openclaw health --json`
 - `openclaw channels status --probe`
 
+Implementation status:
+
+- confirmed external surfaces
+- adapter implementation still pending in this repo
+
 Why these matter:
 
 - they are explicitly user-facing interfaces
 - they are already intended for diagnosis and health inspection
 - they align with a read-only ops-console posture
+
+### Read-only gateway call surfaces
+
+- `openclaw gateway call status`
+- `openclaw gateway call health`
+- `openclaw gateway call sessions.list --params '{}'`
+- `openclaw gateway call <method>` with an allowlisted read-only method set only
+
+Implementation status:
+
+- confirmed external CLI/RPC bridge
+- adapter implementation still pending in this repo
+
+Why these matter:
+
+- they provide structured, scriptable access without importing OpenClaw modules
+- `sessions.list` is directly relevant for session inventory and cross-checking session-store coverage
+- the CLI surface itself is documented and stable enough to treat as an external contract
+
+Important boundary:
+
+- this repo must only consume allowlisted read-only gateway-call methods
+- mutating methods such as config apply/patch remain out of scope
 
 ### Gateway health endpoints
 
@@ -70,7 +98,7 @@ Reason for exclusion:
 
 ## Future Options and Assumptions
 
-These may become valid later, but they are not confirmed enough for implementation beyond the current filesystem path in Phase 1.4.
+These may become valid later, but they are not confirmed enough for implementation beyond the current filesystem adapter and the confirmed CLI/health surfaces listed above.
 
 ### Remote gateway websocket access
 
@@ -94,7 +122,7 @@ Potentially useful for:
 
 Why still considered future work:
 
-- Phase 1.2 should not depend on undocumented or unstable RPC shapes
+- this repo should not depend on undocumented or unstable RPC shapes
 - a real adapter should only consume interfaces we can treat as stable external contracts
 
 ## Risks and Limitations

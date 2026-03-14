@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "OpenClaw Team Ops Sidecar - read-only source collection",
   "main": "dist/main.js",
   "types": "dist/main.d.ts",
   "scripts": {
