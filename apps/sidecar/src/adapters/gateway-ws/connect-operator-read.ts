@@ -12,11 +12,13 @@ export async function connectOperatorRead(
     minProtocol: 3,
     maxProtocol: 3,
     client: {
-      id: "openclaw-team-ops-console",
+      // OpenClaw validates client.id against a fixed enum, so keep a
+      // recognized backend id and surface Team Ops identity via displayName.
+      id: "gateway-client",
       displayName: "OpenClaw Team Ops Console",
       version: "0.2.0-alpha.0",
       platform: process.platform,
-      mode: "ui",
+      mode: "backend",
       instanceId: "openclaw-team-ops-console-sidecar",
     },
     locale: "en-US",

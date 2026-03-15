@@ -156,6 +156,11 @@ test("gateway ws runtime client uses operator.read handshake and only read-only 
         scopes?: string[];
         auth?: { token?: string };
         minProtocol?: number;
+        client?: {
+          id?: string;
+          mode?: string;
+          displayName?: string;
+        };
       }
     | undefined;
 
@@ -165,6 +170,9 @@ test("gateway ws runtime client uses operator.read handshake and only read-only 
   assert.deepEqual(connectParams?.scopes, ["operator.read"]);
   assert.equal(connectParams?.auth?.token, "config-shared-token");
   assert.equal(connectParams?.minProtocol, 3);
+  assert.equal(connectParams?.client?.id, "gateway-client");
+  assert.equal(connectParams?.client?.mode, "backend");
+  assert.equal(connectParams?.client?.displayName, "OpenClaw Team Ops Console");
   assert.ok(!methods.some((method) => ["operator.write", "operator.admin", "operator.approvals", "pairing"].includes(String(method))));
 
   assert.equal(snapshot.presence.items[0]?.deviceId, "device-1");
