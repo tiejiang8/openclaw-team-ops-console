@@ -1,4 +1,4 @@
-# API Contract (v0.2 alpha)
+# API Contract (v0.3 alpha)
 
 Primary contracts are typed in `packages/shared/src/contracts.ts` and implemented by `apps/overlay-api`.
 
@@ -29,6 +29,35 @@ Returns `SummaryResponse`.
 ### `GET /api/auth-profiles`
 ### `GET /api/topology`
 ### `GET /api/runtime-status`
+Returns `RuntimeStatusResponse`.
+
+This contract now includes:
+
+- gateway configured / auth resolved / connection state
+- OpenClaw overall runtime state
+- node paired / connected / stale counts
+- cron total / enabled / overdue / failing counts
+- presence counters and last sync timestamps
+
+### `GET /api/cron`
+Returns `CronJobsResponse`.
+
+Supported filters:
+
+- `source`
+- `status`
+- `q`
+
+### `GET /api/cron/:id`
+Returns `CronJobResponse` or `404 CRON_JOB_NOT_FOUND`.
+
+### `GET /api/nodes`
+Returns `NodesResponse`.
+
+Supported filters:
+
+- `status`
+- `q`
 
 These remain the original read-only inventory contracts.
 

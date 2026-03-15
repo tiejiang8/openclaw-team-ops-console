@@ -2,13 +2,16 @@ import type {
   Agent,
   AuthProfile,
   BindingRoute,
+  CronJobDetailDto,
+  CronJobSummaryDto,
   CoverageSummary,
   InventorySummary,
   LogEntriesQuery,
-  Node,
+  NodeSummaryDto,
   Plugin,
   PresenceEntry,
   RuntimeStatus,
+  RuntimeStatusDto,
   Session,
   SystemSnapshot,
   Target,
@@ -69,8 +72,20 @@ export class SidecarService {
     return (await this.adapter.getPresence()).items;
   }
 
-  async getNodes(): Promise<Node[]> {
+  async getNodes(): Promise<NodeSummaryDto[]> {
     return (await this.adapter.getNodes()).items;
+  }
+
+  async getRuntimeStatus(): Promise<RuntimeStatusDto> {
+    return (await this.adapter.getRuntimeStatus()).item;
+  }
+
+  async getCronJobs(): Promise<CronJobSummaryDto[]> {
+    return (await this.adapter.getCronJobs()).items;
+  }
+
+  async getCronJobById(id: string): Promise<CronJobDetailDto | undefined> {
+    return (await this.adapter.getCronJobById(id)).item;
   }
 
   async getTools(): Promise<Tool[]> {

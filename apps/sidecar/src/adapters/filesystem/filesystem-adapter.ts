@@ -17,12 +17,15 @@ import {
   type BindingRoute,
   type CollectionMetadata,
   type CollectionName,
+  type CronJobDetailDto,
+  type CronJobSummaryDto,
   type EntityStatus,
   type LogEntriesQuery,
-  type Node,
+  type NodeSummaryDto,
   type Plugin,
   type PresenceEntry,
   type RuntimeStatus,
+  type RuntimeStatusDto,
   type Session,
   type SnapshotWarning,
   type SourceCollectionStatus,
@@ -34,6 +37,8 @@ import {
 
 import type {
   AdapterHealth,
+  AdapterCronJobResult,
+  AdapterCronJobsResult,
   AdapterLogEntriesResult,
   AdapterLogFilesResult,
   AdapterLogRawFileResult,
@@ -41,6 +46,7 @@ import type {
   AdapterNodesResult,
   AdapterPluginsResult,
   AdapterPresenceResult,
+  AdapterRuntimeStatusResult,
   AdapterToolsResult,
   SidecarInventoryAdapter,
 } from "../source-adapter.js";
@@ -52,6 +58,8 @@ import { discoverLogFiles } from "./logs/discover-log-files.js";
 import { parseLogLine } from "./logs/parse-log-line.js";
 import { readLogFile } from "./logs/read-log-file.js";
 import { tailLogFile } from "./logs/tail-log-file.js";
+import { buildCronSnapshot } from "./cron/build-cron-snapshot.js";
+import { GatewayRuntimePlaneCache, type GatewayRuntimePlaneState } from "../gateway/runtime-plane-cache.js";
 
 const CONFIG_SOURCE_ID = "filesystem:config-file";
 const RUNTIME_SOURCE_ID = "filesystem:runtime-root";
@@ -117,6 +125,11 @@ interface ResolvedFilesystemPaths {
 interface GatewayRuntimeCacheEntry {
   loadedAtMs: number;
   result: GatewayRuntimeLoadResult;
+}
+
+interface GatewayRuntimePlaneCacheEntry {
+  cacheKey: string;
+  cache: GatewayRuntimePlaneCache;
 }
 
 interface GatewayRuntimeLoadResult {
@@ -1298,6 +1311,154 @@ function createGatewayCollectionStatus(
   };
 }
 
+function createRuntimePlaneCollectionStatus(
+  key: "presence" | "nodes",
+  state: GatewayRuntimePlaneState,
+  itemCount: number,
+): SourceCollectionStatus {
+  const connected = state.connectionState === "connected";
+  const degraded = state.connectionState === "degraded";
+
+  return {
+    key,
+    sourceKind: "gateway-ws",
+    freshness: connected || degraded ? "fresh" : "unknown",
+    coverage: connected ? "complete" : degraded ? "partial" : "unavailable",
+    warningCount: state.warnings.length,
+    ...(itemCount > 0 && state.lastSeenAt ? { lastSuccessAt: state.lastSeenAt } : {}),
+  };
+}
+
+function deriveRuntimeSourceMode(input: {
+  gatewayState: GatewayRuntimePlaneState;
+  cronItems: CronJobSummaryDto[];
+  filesystemDetected: boolean;
+}): RuntimeStatusDto["sourceMode"] {
+  if (input.gatewayState.connectionState === "connected" || input.gatewayState.connectionState === "degraded") {
+    return input.filesystemDetected || input.cronItems.length > 0 ? "hybrid" : "gateway-ws";
+  }
+
+  return "filesystem";
+}
+
+function deriveOpenClawOverallState(input: {
+  stateDirDetected: boolean;
+  configDetected: boolean;
+  logsDetected: boolean;
+  gatewayState: GatewayRuntimePlaneState["connectionState"];
+}): RuntimeStatusDto["openclaw"]["overall"] {
+  const detectedCount = [input.stateDirDetected, input.configDetected, input.logsDetected].filter(Boolean).length;
+
+  if (detectedCount === 0) {
+    return input.gatewayState === "connected" || input.gatewayState === "degraded" ? "partial" : "unavailable";
+  }
+
+  if (detectedCount === 3) {
+    return input.gatewayState === "disconnected" ? "degraded" : "healthy";
+  }
+
+  return detectedCount >= 2 ? "partial" : "degraded";
+}
+
+function mergeCronSummaries(
+  filesystemItems: CronJobSummaryDto[],
+  gatewayItems: CronJobSummaryDto[],
+): CronJobSummaryDto[] {
+  const merged = new Map<string, CronJobSummaryDto>();
+
+  for (const item of filesystemItems) {
+    merged.set(item.id, item);
+  }
+
+  for (const item of gatewayItems) {
+    const existing = merged.get(item.id);
+
+    if (!existing) {
+      merged.set(item.id, item);
+      continue;
+    }
+
+    merged.set(item.id, {
+      ...existing,
+      ...item,
+      scheduleText: existing.scheduleText,
+      ...(existing.sessionTarget ? { sessionTarget: existing.sessionTarget } : item.sessionTarget ? { sessionTarget: item.sessionTarget } : {}),
+      ...(existing.deliveryMode ? { deliveryMode: existing.deliveryMode } : item.deliveryMode ? { deliveryMode: item.deliveryMode } : {}),
+      evidenceRefs: dedupeCronEvidenceRefs([...existing.evidenceRefs, ...item.evidenceRefs]),
+      source: "hybrid",
+    });
+  }
+
+  return Array.from(merged.values()).sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function mergeCronDetails(
+  filesystemItem: CronJobDetailDto | undefined,
+  gatewayItem: CronJobDetailDto | undefined,
+): CronJobDetailDto | undefined {
+  if (!filesystemItem) {
+    return gatewayItem;
+  }
+
+  if (!gatewayItem) {
+    return filesystemItem;
+  }
+
+  return {
+    ...filesystemItem,
+    ...gatewayItem,
+    scheduleText: filesystemItem.scheduleText,
+    warnings: dedupeStrings([...filesystemItem.warnings, ...gatewayItem.warnings]),
+    evidenceRefs: dedupeCronEvidenceRefs([...filesystemItem.evidenceRefs, ...gatewayItem.evidenceRefs]),
+    recentRuns: gatewayItem.recentRuns.length > 0 ? gatewayItem.recentRuns : filesystemItem.recentRuns,
+    source: "hybrid",
+  };
+}
+
+function dedupeCronEvidenceRefs(values: Array<CronJobSummaryDto["evidenceRefs"][number]>): CronJobSummaryDto["evidenceRefs"] {
+  const seen = new Set<string>();
+  const result: CronJobSummaryDto["evidenceRefs"] = [];
+
+  for (const value of values) {
+    const key = `${value.kind}:${value.value}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function deriveCronSource(items: CronJobSummaryDto[]): RuntimeStatusDto["cron"]["source"] {
+  const sources = new Set(items.map((item) => item.source));
+
+  if (sources.has("hybrid")) {
+    return "hybrid";
+  }
+
+  if (sources.has("filesystem") && sources.has("gateway")) {
+    return "hybrid";
+  }
+
+  if (sources.has("gateway")) {
+    return "gateway";
+  }
+
+  if (sources.has("filesystem")) {
+    return "filesystem";
+  }
+
+  if (sources.has("mock")) {
+    return "mock";
+  }
+
+  return "unavailable";
+}
+
 async function scanWorkspaceDirectories(pattern: string): Promise<string[]> {
   const matches: string[] = [];
 
@@ -1424,6 +1585,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
   }) => GatewayRuntimeClient;
   private gatewayRuntimeCache: GatewayRuntimeCacheEntry | undefined;
   private gatewayRuntimeLoadPromise: Promise<GatewayRuntimeLoadResult> | undefined;
+  private gatewayRuntimePlaneCache: GatewayRuntimePlaneCacheEntry | undefined;
 
   constructor(options: FilesystemOpenClawAdapterOptions = {}) {
     this.runtimeRootInput = normalizeInput(options.runtimeRoot);
@@ -2724,38 +2886,56 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
   }
 
   async getPresence(): Promise<AdapterPresenceResult> {
+    const runtimePlane = await this.loadGatewayRuntimePlaneState();
     const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
 
+    if (runtimePlane.state.presence.length === 0 && gatewayRuntime.connected && gatewayRuntime.collections.presence.items.length > 0) {
+      return {
+        items: gatewayRuntime.collections.presence.items,
+        collectionStatus: createGatewayCollectionStatus(
+          "presence",
+          gatewayRuntime.collections.presence,
+          gatewayRuntime.fetchedAt,
+        ),
+        ...withOptionalWarnings(gatewayRuntime.warnings),
+      };
+    }
+
     return {
-      items: gatewayRuntime.collections.presence.items,
-      collectionStatus: gatewayRuntime.configured
-        ? createGatewayCollectionStatus("presence", gatewayRuntime.collections.presence, gatewayRuntime.fetchedAt)
-        : {
-            key: "presence",
-            sourceKind: "gateway-ws",
-            freshness: "unknown",
-            coverage: "unavailable",
-            warningCount: 0,
-          },
-      ...withOptionalWarnings(gatewayRuntime.warnings),
+      items: runtimePlane.state.presence,
+      collectionStatus: createRuntimePlaneCollectionStatus(
+        "presence",
+        runtimePlane.state,
+        runtimePlane.state.presence.length,
+      ),
+      ...withOptionalWarnings(runtimePlane.warnings),
     };
   }
 
   async getNodes(): Promise<AdapterNodesResult> {
+    const runtimePlane = await this.loadGatewayRuntimePlaneState();
     const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
 
+    if (runtimePlane.state.nodes.length === 0 && gatewayRuntime.connected && gatewayRuntime.collections.nodes.items.length > 0) {
+      return {
+        items: gatewayRuntime.collections.nodes.items.map((node) => normalizeLegacyGatewayNode(node)),
+        collectionStatus: createGatewayCollectionStatus(
+          "nodes",
+          gatewayRuntime.collections.nodes,
+          gatewayRuntime.fetchedAt,
+        ),
+        ...withOptionalWarnings(gatewayRuntime.warnings),
+      };
+    }
+
     return {
-      items: gatewayRuntime.collections.nodes.items,
-      collectionStatus: gatewayRuntime.configured
-        ? createGatewayCollectionStatus("nodes", gatewayRuntime.collections.nodes, gatewayRuntime.fetchedAt)
-        : {
-            key: "nodes",
-            sourceKind: "gateway-ws",
-            freshness: "unknown",
-            coverage: "unavailable",
-            warningCount: 0,
-          },
-      ...withOptionalWarnings(gatewayRuntime.warnings),
+      items: runtimePlane.state.nodes,
+      collectionStatus: createRuntimePlaneCollectionStatus(
+        "nodes",
+        runtimePlane.state,
+        runtimePlane.state.nodes.length,
+      ),
+      ...withOptionalWarnings(runtimePlane.warnings),
     };
   }
 
@@ -2792,6 +2972,141 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
             warningCount: 0,
           },
       ...withOptionalWarnings(gatewayRuntime.warnings),
+    };
+  }
+
+  async getRuntimeStatus(): Promise<AdapterRuntimeStatusResult> {
+    const resolved = this.resolvePaths();
+    const [runtimePlane, cronSnapshot, logFiles] = await Promise.all([
+      this.loadGatewayRuntimePlaneState(),
+      buildCronSnapshot(resolved.runtimeRoot, this.clock.now()),
+      discoverLogFiles({
+        configFile: resolved.configFile,
+        configBaseDir: resolved.configBaseDir,
+        logGlob: resolved.logGlob,
+        now: this.clock.now(),
+      }),
+    ]);
+    const mergedCronJobs = mergeCronSummaries(cronSnapshot.items, runtimePlane.state.cronJobs);
+    const stateDirStat = resolved.runtimeRoot ? await statIfExists(resolved.runtimeRoot) : { exists: false, isDirectory: false, modifiedAt: undefined };
+    const configDetected = Boolean(
+      resolved.configFile &&
+        (await statIfExists(resolved.configFile)).exists,
+    );
+    const connectedNodes = runtimePlane.state.nodes.filter((node) => node.connected).length;
+    const pairedNodes = runtimePlane.state.nodes.filter((node) => node.paired).length;
+    const staleNodes = runtimePlane.state.nodes.filter((node) => node.paired && !node.connected).length;
+    const failingCron = mergedCronJobs.filter((job) => job.lastRunState === "error").length;
+    const cronLastSyncAt = latestIsoDate(cronSnapshot.lastSyncAt, runtimePlane.state.lastSeenAt);
+    const runtimeStatus: RuntimeStatusDto = {
+      sourceMode: deriveRuntimeSourceMode({
+        gatewayState: runtimePlane.state,
+        cronItems: mergedCronJobs,
+        filesystemDetected: stateDirStat.exists || configDetected || logFiles.items.length > 0,
+      }),
+      snapshotAt: this.clock.now().toISOString(),
+      gateway: {
+        configured: runtimePlane.state.configured,
+        authResolved: runtimePlane.state.authResolved,
+        ...(resolved.gatewayUrl ? { url: resolved.gatewayUrl } : {}),
+        connectionState: runtimePlane.state.connectionState,
+        ...(typeof runtimePlane.state.rpcHealthy === "boolean" ? { rpcHealthy: runtimePlane.state.rpcHealthy } : {}),
+        ...(runtimePlane.state.identity ? { identity: runtimePlane.state.identity } : {}),
+        ...(runtimePlane.state.lastSeenAt ? { lastSeenAt: runtimePlane.state.lastSeenAt } : {}),
+        warnings: runtimePlane.state.warnings,
+      },
+      openclaw: {
+        overall: deriveOpenClawOverallState({
+          stateDirDetected: stateDirStat.exists && stateDirStat.isDirectory,
+          configDetected,
+          logsDetected: logFiles.items.length > 0,
+          gatewayState: runtimePlane.state.connectionState,
+        }),
+        stateDirDetected: stateDirStat.exists && stateDirStat.isDirectory,
+        configDetected,
+        logsDetected: logFiles.items.length > 0,
+      },
+      nodes: {
+        paired: pairedNodes,
+        connected: connectedNodes,
+        stale: staleNodes,
+        source:
+          runtimePlane.state.nodes.length > 0
+            ? "gateway"
+            : runtimePlane.state.configured
+              ? "unavailable"
+              : "unavailable",
+        ...(runtimePlane.state.lastSeenAt ? { lastSyncAt: runtimePlane.state.lastSeenAt } : {}),
+      },
+      cron: {
+        total: mergedCronJobs.length,
+        enabled: mergedCronJobs.filter((job) => job.enabled).length,
+        overdue: mergedCronJobs.filter((job) => job.overdue).length,
+        failing: failingCron,
+        source: deriveCronSource(mergedCronJobs),
+        ...(cronLastSyncAt ? { lastSyncAt: cronLastSyncAt } : {}),
+      },
+      presence: {
+        onlineDevices: runtimePlane.state.presence.filter((entry) => entry.online).length,
+        onlineOperators: runtimePlane.state.presence.filter((entry) => entry.online && entry.roles.includes("operator")).length,
+        ...(runtimePlane.state.lastSeenAt ? { lastSyncAt: runtimePlane.state.lastSeenAt } : {}),
+      },
+    };
+
+    return {
+      item: runtimeStatus,
+      collectionStatus: {
+        key: "runtimeStatuses",
+        sourceKind: runtimeStatus.sourceMode === "mock" ? "mock" : runtimeStatus.sourceMode === "gateway-ws" ? "gateway-ws" : "filesystem",
+        freshness: runtimePlane.state.connectionState === "connected" ? "fresh" : "unknown",
+        coverage: runtimePlane.state.connectionState === "degraded" ? "partial" : runtimePlane.state.connectionState === "connected" ? "complete" : "unavailable",
+        warningCount: runtimePlane.warnings.length + cronSnapshot.warnings.length,
+      },
+      warnings: [
+        ...runtimePlane.warnings,
+        ...cronSnapshot.warnings.map((entry) =>
+          warning("OPENCLAW_RUNTIME_PLANE_WARNING", "warn", entry, "runtimeStatuses", GATEWAY_WS_SOURCE_ID),
+        ),
+      ],
+    };
+  }
+
+  async getCronJobs(): Promise<AdapterCronJobsResult> {
+    const resolved = this.resolvePaths();
+    const [snapshot, runtimePlane] = await Promise.all([
+      buildCronSnapshot(resolved.runtimeRoot, this.clock.now()),
+      this.loadGatewayRuntimePlaneState(),
+    ]);
+    const items = mergeCronSummaries(snapshot.items, runtimePlane.state.cronJobs);
+    const warnings = [...runtimePlane.warnings, ...snapshot.warnings.map((message) => warning("OPENCLAW_CRON_READ_WARNING", "warn", message, undefined, RUNTIME_SOURCE_ID))];
+
+    return {
+      items,
+      collectionStatus: snapshot.collectionStatus,
+      warnings,
+    };
+  }
+
+  async getCronJobById(id: string): Promise<AdapterCronJobResult> {
+    const resolved = this.resolvePaths();
+    const [snapshot, runtimePlane] = await Promise.all([
+      buildCronSnapshot(resolved.runtimeRoot, this.clock.now()),
+      this.loadGatewayRuntimePlaneState(),
+    ]);
+    const filesystemItem = snapshot.detailsById.get(id);
+    let gatewayItem: CronJobDetailDto | undefined;
+
+    if (runtimePlane.state.connectionState === "connected" || runtimePlane.state.connectionState === "degraded") {
+      gatewayItem = await this.gatewayRuntimePlaneCache?.cache.getCronJobById(id);
+    }
+
+    const item = mergeCronDetails(filesystemItem, gatewayItem);
+    const warnings = [...runtimePlane.warnings, ...snapshot.warnings.map((message) => warning("OPENCLAW_CRON_READ_WARNING", "warn", message, undefined, RUNTIME_SOURCE_ID))];
+
+    return {
+      item,
+      collectionStatus: snapshot.collectionStatus,
+      warnings,
     };
   }
 
@@ -3014,6 +3329,41 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     } finally {
       this.gatewayRuntimeLoadPromise = undefined;
     }
+  }
+
+  private async loadGatewayRuntimePlaneState(): Promise<{
+    state: GatewayRuntimePlaneState;
+    warnings: SnapshotWarning[];
+  }> {
+    const resolved = this.resolvePaths();
+    const gatewayAuth = await this.resolveGatewayAuth(resolved);
+    const cacheKey = `${resolved.gatewayUrl ?? "none"}::${gatewayAuth.token ?? "none"}`;
+
+    if (this.gatewayRuntimePlaneCache?.cacheKey !== cacheKey) {
+      this.gatewayRuntimePlaneCache?.cache.reset();
+      this.gatewayRuntimePlaneCache = {
+        cacheKey,
+        cache: new GatewayRuntimePlaneCache({
+          timeoutMs: this.gatewayTimeoutMs,
+          ...(resolved.gatewayUrl ? { url: resolved.gatewayUrl } : {}),
+          ...(gatewayAuth.token ? { authToken: gatewayAuth.token } : {}),
+        }),
+      };
+    }
+
+    const state = await this.gatewayRuntimePlaneCache.cache.getState();
+    const warningMessages = dedupeStrings([...gatewayAuth.warnings.map((entry) => entry.message), ...state.warnings]);
+    const warnings = warningMessages.map((message) =>
+      warning("OPENCLAW_GATEWAY_RUNTIME_PLANE_WARNING", "warn", message, "runtimeStatuses", GATEWAY_WS_SOURCE_ID),
+    );
+
+    return {
+      state: {
+        ...state,
+        warnings: warningMessages,
+      },
+      warnings,
+    };
   }
 
   private async findWorkspacePathById(workspaceId: string): Promise<string | undefined> {
@@ -3248,6 +3598,32 @@ function buildLogReadWarning(filePath: string, error: unknown): SnapshotWarning 
     severity: "warn",
     message: `Failed to read log file ${filePath}: ${error instanceof Error ? error.message : "unknown error"}`,
     sourceId: LOG_SOURCE_ID,
+  };
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
+}
+
+function normalizeLegacyGatewayNode(node: {
+  deviceId: string;
+  roles: string[];
+  scopes: string[];
+  online: boolean;
+  lastSeenAt?: string;
+}): NodeSummaryDto {
+  return {
+    id: node.deviceId,
+    paired: true,
+    connected: node.online,
+    ...(node.lastSeenAt ? { lastConnectAt: node.lastSeenAt } : {}),
+    ...(node.roles.length > 0 ? { capabilities: node.roles } : {}),
+    source: "gateway",
+    deviceId: node.deviceId,
+    roles: node.roles,
+    scopes: node.scopes,
+    online: node.online,
+    ...(node.lastSeenAt ? { lastSeenAt: node.lastSeenAt } : {}),
   };
 }
 

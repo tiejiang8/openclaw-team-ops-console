@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 
+import { RuntimeStatusBar } from "../components/runtime/runtime-status-bar.js";
 import { RuntimeSourceMarker } from "../components/runtime-source-marker.js";
 import { useI18n } from "../lib/i18n.js";
 
@@ -10,6 +11,8 @@ export function ConsoleLayout() {
     { to: "/targets", label: t("nav.targets") },
     { to: "/coverage", label: t("nav.coverage") },
     { to: "/logs", label: t("nav.logs") },
+    { to: "/cron", label: t("nav.cron") },
+    { to: "/nodes", label: t("nav.nodes") },
     { to: "/risks", label: t("nav.risks") },
     { to: "/findings", label: t("nav.findings") },
     { to: "/evidence", label: t("nav.evidence") },
@@ -67,6 +70,7 @@ export function ConsoleLayout() {
       </aside>
 
       <main className="main-content">
+        <RuntimeStatusBar />
         <Outlet />
       </main>
     </div>

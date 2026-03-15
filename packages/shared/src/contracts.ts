@@ -29,6 +29,9 @@ import type {
   WorkspaceDocument,
 } from "./domain.js";
 import type { ApiMeta, CoverageSummary } from "./observability.js";
+import type { CronJobDetailDto, CronJobSummaryDto } from "./contracts/cron.js";
+import type { NodeSummaryCountsDto, NodeSummaryDto } from "./contracts/nodes.js";
+import type { RuntimeStatusDto } from "./contracts/runtime-plane.js";
 
 export interface ResponseMeta extends ApiMeta {}
 
@@ -77,6 +80,8 @@ export interface RuntimeStatusesResponse {
   meta: ResponseMeta;
 }
 
+export interface RuntimeStatusResponse extends ItemResponse<RuntimeStatusDto> {}
+
 export interface TopologyResponse {
   data: TopologyView;
   meta: ResponseMeta;
@@ -111,6 +116,10 @@ export type LogSummaryResponse = ItemResponse<LogSummary>;
 export type LogEntriesResponse = ItemResponse<LogEntriesPage>;
 export type LogRawFileResponse = ItemResponse<LogRawFile>;
 export type PresenceResponse = ListResponse<PresenceEntry>;
-export type NodesResponse = ListResponse<Node>;
+export interface NodesResponse extends ListResponse<NodeSummaryDto> {
+  summary?: NodeSummaryCountsDto;
+}
 export type ToolsResponse = ListResponse<Tool>;
 export type PluginsResponse = ListResponse<Plugin>;
+export type CronJobsResponse = ListResponse<CronJobSummaryDto>;
+export interface CronJobResponse extends ItemResponse<CronJobDetailDto> {}

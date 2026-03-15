@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-export function useResource<T>(key: string, loader: () => Promise<T>) {
+interface UseResourceOptions {
+  refreshIntervalMs?: number;
+}
+
+export function useResource<T>(key: string, loader: () => Promise<T>, options: UseResourceOptions = {}) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +42,20 @@ export function useResource<T>(key: string, loader: () => Promise<T>) {
       cancelled = true;
     };
   }, [attempt, key, loader]);
+
+  useEffect(() => {
+    if (!options.refreshIntervalMs || options.refreshIntervalMs <= 0) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      setAttempt((value) => value + 1);
+    }, options.refreshIntervalMs);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [options.refreshIntervalMs]);
 
   return {
     data,

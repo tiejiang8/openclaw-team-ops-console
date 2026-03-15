@@ -3,6 +3,8 @@ import type {
   AgentsResponse,
   AuthProfilesResponse,
   BindingsResponse,
+  CronJobResponse,
+  CronJobsResponse,
   CoverageResponse,
   HealthResponse,
   LogEntriesQuery,
@@ -13,6 +15,7 @@ import type {
   NodesResponse,
   PluginsResponse,
   PresenceResponse,
+  RuntimeStatusResponse,
   SummaryResponse,
   TargetResponse,
   TargetsResponse,
@@ -168,6 +171,28 @@ export class SidecarClient {
 
   async getNodes(): Promise<NodesResponse> {
     return this.request<NodesResponse>("/sidecar/nodes");
+  }
+
+  async getRuntimeStatus(): Promise<RuntimeStatusResponse> {
+    return this.request<RuntimeStatusResponse>("/sidecar/runtime-status");
+  }
+
+  async getCronJobs(): Promise<CronJobsResponse> {
+    return this.request<CronJobsResponse>("/sidecar/cron");
+  }
+
+  async getCronJob(id: string): Promise<CronJobResponse | undefined> {
+    const response = await this.fetch(`/sidecar/cron/${encodeURIComponent(id)}`);
+
+    if (response.status === 404) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Sidecar returned ${response.status} for cron job ${id}`);
+    }
+
+    return (await response.json()) as CronJobResponse;
   }
 
   async getTools(): Promise<ToolsResponse> {

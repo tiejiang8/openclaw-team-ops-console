@@ -330,6 +330,70 @@ export function createSidecarRouter(service: SidecarService, adapter: SidecarInv
     );
   }));
 
+  router.get("/sidecar/runtime-status", handleAsync(async (_request, response) => {
+    const snapshot = await service.getSnapshot();
+    const result = await adapter.getRuntimeStatus();
+
+    response.json(
+      createItemResponse(
+        result.item,
+        buildSnapshotMeta(snapshot, {
+          collectionStatuses: [result.collectionStatus],
+          sourceKinds: [result.collectionStatus.sourceKind],
+          ...withWarnings(result.warnings),
+        }),
+      ),
+    );
+  }));
+
+  router.get("/sidecar/cron", handleAsync(async (_request, response) => {
+    const snapshot = await service.getSnapshot();
+    const result = await adapter.getCronJobs();
+
+    response.json(
+      createListResponse(
+        result.items,
+        buildSnapshotMeta(snapshot, {
+          collectionStatuses: [result.collectionStatus],
+          sourceKinds: [result.collectionStatus.sourceKind],
+          ...withWarnings(result.warnings),
+        }),
+      ),
+    );
+  }));
+
+  router.get("/sidecar/cron/:id", handleAsync(async (request, response) => {
+    const snapshot = await service.getSnapshot();
+    const result = await adapter.getCronJobById(request.params.id ?? "");
+
+    if (!result.item) {
+      const body: ErrorResponse = {
+        error: {
+          code: "CRON_JOB_NOT_FOUND",
+          message: `Cron job ${request.params.id} was not found`,
+        },
+        meta: buildSnapshotMeta(snapshot, {
+          collectionStatuses: [result.collectionStatus],
+          sourceKinds: [result.collectionStatus.sourceKind],
+          ...withWarnings(result.warnings),
+        }),
+      };
+      response.status(404).json(body);
+      return;
+    }
+
+    response.json(
+      createItemResponse(
+        result.item,
+        buildSnapshotMeta(snapshot, {
+          collectionStatuses: [result.collectionStatus],
+          sourceKinds: [result.collectionStatus.sourceKind],
+          ...withWarnings(result.warnings),
+        }),
+      ),
+    );
+  }));
+
   router.get("/sidecar/tools", handleAsync(async (_request, response) => {
     const snapshot = await service.getSnapshot();
     const result = await adapter.getTools();

@@ -4,6 +4,8 @@ import type {
   AuthProfilesResponse,
   BindingsResponse,
   CoverageResponse,
+  CronJobResponse,
+  CronJobsResponse,
   EvidenceResponse,
   EvidencesResponse,
   FindingResponse,
@@ -14,10 +16,11 @@ import type {
   LogFilesResponse,
   LogRawFileResponse,
   LogSummaryResponse,
+  NodesResponse,
   RecommendationResponse,
   RecommendationsResponse,
   RisksSummaryResponse,
-  RuntimeStatusesResponse,
+  RuntimeStatusResponse,
   SummaryResponse,
   TargetResponse,
   TargetsResponse,
@@ -28,9 +31,9 @@ import type {
   SessionsResponse,
 } from "@openclaw-team-ops/shared";
 
-const API_BASE_URL = (import.meta.env.VITE_OVERLAY_API_URL ?? "").replace(/\/$/, "");
+export const API_BASE_URL = (import.meta.env.VITE_OVERLAY_API_URL ?? "").replace(/\/$/, "");
 
-async function request<T>(path: string): Promise<T> {
+export async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       accept: "application/json",
@@ -44,7 +47,7 @@ async function request<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-function withQuery(path: string, query: Record<string, string | undefined>): string {
+export function withQuery(path: string, query: Record<string, string | undefined>): string {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(query)) {
@@ -107,5 +110,8 @@ export const overlayApi = {
   getBindings: () => request<BindingsResponse>("/api/bindings"),
   getAuthProfiles: () => request<AuthProfilesResponse>("/api/auth-profiles"),
   getTopology: () => request<TopologyResponse>("/api/topology"),
-  getRuntimeStatuses: () => request<RuntimeStatusesResponse>("/api/runtime-status"),
+  getRuntimeStatus: () => request<RuntimeStatusResponse>("/api/runtime-status"),
+  getNodes: (query: Record<string, string | undefined> = {}) => request<NodesResponse>(withQuery("/api/nodes", query)),
+  getCronJobs: (query: Record<string, string | undefined> = {}) => request<CronJobsResponse>(withQuery("/api/cron", query)),
+  getCronJob: (cronId: string) => request<CronJobResponse>(`/api/cron/${encodeURIComponent(cronId)}`),
 };

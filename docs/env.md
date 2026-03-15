@@ -50,8 +50,21 @@ When the filesystem adapter is active, the sidecar derives the rest by default:
 - workspaces: `<stateDir>/workspace*`
 - per-agent sessions: `<stateDir>/agents/<agentId>/sessions/sessions.json`
 - legacy main-agent sessions fallback: `<stateDir>/sessions/sessions.json`
+- cron jobs: `<stateDir>/cron/jobs.json`
+- cron recent runs: `<stateDir>/cron/runs/*.jsonl`
 
 You do not need to set `OPENCLAW_CONFIG_PATH` or `OPENCLAW_WORKSPACE_GLOB` for the normal local layout.
+
+## Gateway runtime plane
+
+If you set both `OPENCLAW_GATEWAY_URL` and `OPENCLAW_GATEWAY_TOKEN`, the sidecar can enrich the console with read-only runtime plane data:
+
+- gateway connectivity and identity
+- nodes paired / connected state
+- presence freshness
+- live cron summaries
+
+The browser never connects to the Gateway directly. The token stays on the sidecar / server side only.
 
 ## Docker Compose
 

@@ -1,13 +1,16 @@
 import type {
   AdapterSourceDescriptor,
+  CronJobDetailDto,
+  CronJobSummaryDto,
   LogEntriesPage,
   LogEntriesQuery,
   LogFile,
   LogRawFile,
   LogSummary,
-  Node,
+  NodeSummaryDto,
   Plugin,
   PresenceEntry,
+  RuntimeStatusDto,
   SnapshotSource,
   SourceCollectionStatus,
   SnapshotWarning,
@@ -63,7 +66,7 @@ export interface AdapterPresenceResult extends AdapterRuntimePlaneResultBase {
 }
 
 export interface AdapterNodesResult extends AdapterRuntimePlaneResultBase {
-  items: Node[];
+  items: NodeSummaryDto[];
 }
 
 export interface AdapterToolsResult extends AdapterRuntimePlaneResultBase {
@@ -72,6 +75,18 @@ export interface AdapterToolsResult extends AdapterRuntimePlaneResultBase {
 
 export interface AdapterPluginsResult extends AdapterRuntimePlaneResultBase {
   items: Plugin[];
+}
+
+export interface AdapterRuntimeStatusResult extends AdapterRuntimePlaneResultBase {
+  item: RuntimeStatusDto;
+}
+
+export interface AdapterCronJobsResult extends AdapterRuntimePlaneResultBase {
+  items: CronJobSummaryDto[];
+}
+
+export interface AdapterCronJobResult extends AdapterRuntimePlaneResultBase {
+  item: CronJobDetailDto | undefined;
 }
 
 export interface SidecarInventoryAdapter {
@@ -90,5 +105,8 @@ export interface SidecarInventoryAdapter {
   getNodes(): Promise<AdapterNodesResult>;
   getTools(): Promise<AdapterToolsResult>;
   getPlugins(): Promise<AdapterPluginsResult>;
+  getRuntimeStatus(): Promise<AdapterRuntimeStatusResult>;
+  getCronJobs(): Promise<AdapterCronJobsResult>;
+  getCronJobById(id: string): Promise<AdapterCronJobResult>;
   healthCheck(): Promise<AdapterHealth>;
 }

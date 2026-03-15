@@ -5,21 +5,24 @@ import { DataState } from "../components/data-state.js";
 import { CoverageBadge } from "../components/coverage-badge.js";
 import { MetricCard } from "../components/metric-card.js";
 import { PageObservability } from "../components/page-observability.js";
+import { RuntimeStatusCard } from "../components/runtime/runtime-status-card.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
 import { overlayApi } from "../lib/api.js";
+import { getRuntimeStatus } from "../lib/api/runtime.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
   const { language, t, translateComponentType, translateFreshness, translateSignal, translateTargetSourceKind } = useI18n();
   const loadOverview = useCallback(async () => {
-    const [health, summary, targets, risksSummary, coverage] = await Promise.all([
+    const [health, summary, targets, risksSummary, coverage, runtimeStatus] = await Promise.all([
       overlayApi.getHealth(),
       overlayApi.getSummary(),
       overlayApi.getTargets(),
       overlayApi.getRisksSummary(),
       overlayApi.getCoverage(),
+      getRuntimeStatus(),
     ]);
 
     return {
@@ -28,10 +31,11 @@ export function OverviewPage() {
       targets,
       risksSummary,
       coverage,
+      runtimeStatus,
     };
   }, []);
 
-  const { data, loading, error, retry } = useResource("overview", loadOverview);
+  const { data, loading, error, retry } = useResource("overview", loadOverview, { refreshIntervalMs: 5000 });
 
   const drillDownItems = useMemo(() => {
     if (!data) {
@@ -46,6 +50,8 @@ export function OverviewPage() {
       { to: "/sessions", label: t("nav.sessions"), count: data.summary.data.totals.sessions },
       { to: "/bindings", label: t("nav.bindings"), count: data.summary.data.totals.bindings },
       { to: "/auth-profiles", label: t("nav.authProfiles"), count: data.summary.data.totals.authProfiles },
+      { to: "/cron", label: t("nav.cron"), count: data.runtimeStatus.data.cron.total },
+      { to: "/nodes", label: t("nav.nodes"), count: data.runtimeStatus.data.nodes.paired },
       { to: "/topology", label: t("nav.topology"), count: data.summary.runtimeStatuses.length },
     ];
   }, [data, t]);
@@ -96,6 +102,17 @@ export function OverviewPage() {
             </div>
 
             <div className="metrics-grid">
+              <MetricCard label={t("runtime.gateway")} value={data.runtimeStatus.data.gateway.connectionState} />
+              <MetricCard
+                label={t("runtime.nodes")}
+                value={data.runtimeStatus.data.nodes.connected}
+                detail={`${data.runtimeStatus.data.nodes.paired} paired`}
+              />
+              <MetricCard
+                label={t("runtime.cron")}
+                value={data.runtimeStatus.data.cron.total}
+                detail={`${data.runtimeStatus.data.cron.overdue} overdue`}
+              />
               <MetricCard label={t("overview.metric.targets")} value={fleetMetrics.targetCount} />
               <MetricCard label={t("overview.metric.targetWarnings")} value={fleetMetrics.warningCount} />
               <MetricCard label={t("overview.metric.targetRisk")} value={fleetMetrics.highestRiskScore} />
@@ -114,6 +131,8 @@ export function OverviewPage() {
               <MetricCard label={t("overview.metric.coverageCollections")} value={data.coverage.data.collections.length} />
               <MetricCard label={t("overview.metric.snapshotTime")} value={formatTimestamp(data.summary.meta.generatedAt, language)} />
             </div>
+
+            <RuntimeStatusCard runtime={data.runtimeStatus.data} />
 
             <div className="panel">
               <div className="panel-header">

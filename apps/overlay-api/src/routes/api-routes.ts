@@ -2,7 +2,10 @@ import { createResponseMeta, type ErrorResponse, type HealthResponse } from "@op
 import express, { type Router } from "express";
 
 import { SidecarClient } from "../clients/sidecar-client.js";
+import { createCronRouter } from "../routes/cron-routes.js";
 import { createLogsRouter } from "../routes/logs.js";
+import { createNodeRouter } from "../routes/node-routes.js";
+import { createRuntimeStatusRouter } from "../routes/runtime-status-routes.js";
 import { buildApiMeta } from "../services/api-meta.js";
 import { LogsService } from "../services/logs-service.js";
 import { OverlayService } from "../services/overlay-service.js";
@@ -17,6 +20,9 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
   });
 
   router.use(createLogsRouter(logsService));
+  router.use(createRuntimeStatusRouter(service));
+  router.use(createCronRouter(service));
+  router.use(createNodeRouter(service));
 
   router.get("/health", async (_request, response) => {
     try {
@@ -333,14 +339,6 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
     }
   });
 
-  router.get("/api/nodes", async (_request, response, next) => {
-    try {
-      response.json(await service.getNodes());
-    } catch (error) {
-      next(error);
-    }
-  });
-
   router.get("/api/tools", async (_request, response, next) => {
     try {
       response.json(await service.getTools());
@@ -376,14 +374,6 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
   router.get("/api/topology", async (_request, response, next) => {
     try {
       response.json(await service.getTopology());
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  router.get("/api/runtime-status", async (_request, response, next) => {
-    try {
-      response.json(await service.getRuntimeStatuses());
     } catch (error) {
       next(error);
     }

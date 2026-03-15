@@ -4,6 +4,9 @@ import { join } from "node:path";
 const filesToCheck = [
   "apps/sidecar/src/routes/sidecar-routes.ts",
   "apps/overlay-api/src/routes/api-routes.ts",
+  "apps/overlay-api/src/routes/runtime-status-routes.ts",
+  "apps/overlay-api/src/routes/cron-routes.ts",
+  "apps/overlay-api/src/routes/node-routes.ts",
 ];
 
 const forbiddenRoutePattern = /\b(?:router|app)\.(post|put|patch|delete)\s*\(/g;

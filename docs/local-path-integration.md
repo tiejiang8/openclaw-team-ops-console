@@ -22,6 +22,7 @@ The sidecar switches from mock mode to filesystem mode when any of these are set
 - `OPENCLAW_PROFILE`
 
 `OPENCLAW_SOURCE_ROOT` is informational only. It does not activate the filesystem adapter by itself.
+`OPENCLAW_GATEWAY_URL` and `OPENCLAW_GATEWAY_TOKEN` do not activate filesystem mode by themselves; they enrich runtime-plane data when the Gateway is reachable.
 
 The placeholder example path `/path/to/your/.openclaw` is treated as unset on purpose, so copying `.env.example` still keeps the sidecar in mock mode until you replace that path with a real one.
 
@@ -43,6 +44,32 @@ Used for:
 - per-agent session stores
 - legacy single-agent session-store fallback
 - per-agent auth profile files
+- cron jobs at `<stateDir>/cron/jobs.json`
+- cron recent runs at `<stateDir>/cron/runs/*.jsonl`
+
+### `OPENCLAW_GATEWAY_URL`
+
+Expected value:
+
+- Gateway WebSocket URL such as `ws://127.0.0.1:4318/gateway`
+
+Behavior:
+
+- enables read-only runtime-plane enrichment
+- used only from the sidecar
+- never exposed directly to the browser as a credentialed client
+
+### `OPENCLAW_GATEWAY_TOKEN`
+
+Expected value:
+
+- token with `operator.read` scope
+
+Behavior:
+
+- optional when the token can already be resolved from `openclaw.json`
+- remains server-side only
+- only read-only RPC methods are allowlisted
 
 Resolution notes:
 

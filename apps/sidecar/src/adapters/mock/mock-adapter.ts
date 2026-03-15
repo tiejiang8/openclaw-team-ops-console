@@ -1,13 +1,20 @@
 import type {
   AdapterSourceDescriptor,
+  CronJobDetailDto,
+  CronJobSummaryDto,
   LogEntriesQuery,
   LogLevel,
+  NodeSummaryDto,
+  PresenceEntry,
+  RuntimeStatusDto,
   SystemSnapshot,
   WorkspaceDocument,
 } from "@openclaw-team-ops/shared";
 
 import type {
   AdapterHealth,
+  AdapterCronJobResult,
+  AdapterCronJobsResult,
   AdapterLogEntriesResult,
   AdapterLogFilesResult,
   AdapterLogRawFileResult,
@@ -15,6 +22,7 @@ import type {
   AdapterNodesResult,
   AdapterPluginsResult,
   AdapterPresenceResult,
+  AdapterRuntimeStatusResult,
   AdapterToolsResult,
   SidecarInventoryAdapter,
 } from "../source-adapter.js";
@@ -167,44 +175,32 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
   }
 
   async getPresence(): Promise<AdapterPresenceResult> {
+    const items = buildMockPresence();
+
     return {
-      items: [],
+      items,
       collectionStatus: {
         key: "presence",
         sourceKind: "mock",
-        freshness: "unknown",
-        coverage: "unavailable",
-        warningCount: 1,
+        freshness: "fresh",
+        coverage: "complete",
+        warningCount: 0,
       },
-      warnings: [
-        {
-          code: "MOCK_GATEWAY_PRESENCE_UNAVAILABLE",
-          severity: "info",
-          message: "Mock mode does not provide Gateway WebSocket presence data.",
-          sourceId: `mock:${this.scenario}`,
-        },
-      ],
     };
   }
 
   async getNodes(): Promise<AdapterNodesResult> {
+    const items = buildMockNodes();
+
     return {
-      items: [],
+      items,
       collectionStatus: {
         key: "nodes",
         sourceKind: "mock",
-        freshness: "unknown",
-        coverage: "unavailable",
-        warningCount: 1,
+        freshness: "fresh",
+        coverage: "complete",
+        warningCount: 0,
       },
-      warnings: [
-        {
-          code: "MOCK_GATEWAY_NODES_UNAVAILABLE",
-          severity: "info",
-          message: "Mock mode does not provide Gateway WebSocket node inventory.",
-          sourceId: `mock:${this.scenario}`,
-        },
-      ],
     };
   }
 
@@ -250,6 +246,95 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
     };
   }
 
+  async getRuntimeStatus(): Promise<AdapterRuntimeStatusResult> {
+    const now = new Date().toISOString();
+    const cronJobs = buildMockCronJobs();
+    const nodes = buildMockNodes();
+    const presence = buildMockPresence();
+
+    const item: RuntimeStatusDto = {
+      sourceMode: "mock",
+      snapshotAt: now,
+      gateway: {
+        configured: false,
+        authResolved: false,
+        connectionState: "not-configured",
+        warnings: [],
+      },
+      openclaw: {
+        overall: "healthy",
+        stateDirDetected: true,
+        configDetected: true,
+        logsDetected: true,
+      },
+      nodes: {
+        paired: nodes.filter((node) => node.paired).length,
+        connected: nodes.filter((node) => node.connected).length,
+        stale: nodes.filter((node) => node.paired && !node.connected).length,
+        source: "mock",
+        lastSyncAt: now,
+      },
+      cron: {
+        total: cronJobs.length,
+        enabled: cronJobs.filter((job) => job.enabled).length,
+        overdue: cronJobs.filter((job) => job.overdue).length,
+        failing: cronJobs.filter((job) => job.lastRunState === "error").length,
+        source: "mock",
+        lastSyncAt: now,
+      },
+      presence: {
+        onlineDevices: presence.filter((entry) => entry.online).length,
+        onlineOperators: presence.filter((entry) => entry.online && entry.roles.includes("operator")).length,
+        lastSyncAt: now,
+      },
+    };
+
+    return {
+      item,
+      collectionStatus: {
+        key: "runtimeStatuses",
+        sourceKind: "mock",
+        freshness: "fresh",
+        coverage: "complete",
+        warningCount: 0,
+        lastSuccessAt: now,
+      },
+    };
+  }
+
+  async getCronJobs(): Promise<AdapterCronJobsResult> {
+    const now = new Date().toISOString();
+
+    return {
+      items: buildMockCronJobs(),
+      collectionStatus: {
+        key: "cron",
+        sourceKind: "mock",
+        freshness: "fresh",
+        coverage: "complete",
+        warningCount: 0,
+        lastSuccessAt: now,
+      },
+    };
+  }
+
+  async getCronJobById(id: string): Promise<AdapterCronJobResult> {
+    const item = buildMockCronJobDetail(id);
+    const now = new Date().toISOString();
+
+    return {
+      item,
+      collectionStatus: {
+        key: "cron",
+        sourceKind: "mock",
+        freshness: "fresh",
+        coverage: item ? "complete" : "unavailable",
+        warningCount: 0,
+        ...(item ? { lastSuccessAt: now } : {}),
+      },
+    };
+  }
+
   async healthCheck(): Promise<AdapterHealth> {
     const observedAt = new Date().toISOString();
 
@@ -292,6 +377,128 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
         : {}),
     };
   }
+}
+
+function buildMockPresence(): PresenceEntry[] {
+  return [
+    {
+      deviceId: "mock-gateway",
+      roles: ["gateway", "operator"],
+      scopes: ["operator.read"],
+      online: true,
+      lastSeenAt: "2026-03-15T09:20:00.000Z",
+    },
+    {
+      deviceId: "mock-node-1",
+      roles: ["operator"],
+      scopes: ["operator.read"],
+      online: true,
+      lastSeenAt: "2026-03-15T09:19:00.000Z",
+    },
+  ];
+}
+
+function buildMockNodes(): NodeSummaryDto[] {
+  return [
+    {
+      id: "mock-node-1",
+      name: "Ops Relay",
+      platform: "linux",
+      paired: true,
+      connected: true,
+      lastConnectAt: "2026-03-15T09:19:00.000Z",
+      capabilities: ["gateway", "sessions", "cron"],
+      source: "mock",
+      deviceId: "mock-node-1",
+      roles: ["operator"],
+      scopes: ["operator.read"],
+      online: true,
+      lastSeenAt: "2026-03-15T09:19:00.000Z",
+    },
+    {
+      id: "mock-node-2",
+      name: "Night Shift Runner",
+      platform: "darwin",
+      paired: true,
+      connected: false,
+      lastConnectAt: "2026-03-15T08:10:00.000Z",
+      capabilities: ["cron"],
+      source: "mock",
+      deviceId: "mock-node-2",
+      roles: ["operator"],
+      scopes: ["operator.read"],
+      online: false,
+      lastSeenAt: "2026-03-15T08:10:00.000Z",
+    },
+  ];
+}
+
+function buildMockCronJobs(): CronJobSummaryDto[] {
+  return [
+    {
+      id: "mock-cron-1",
+      name: "Workspace Heartbeat",
+      scheduleText: "*/15 * * * *",
+      timezone: "UTC",
+      enabled: true,
+      sessionTarget: "session:main:heartbeat",
+      deliveryMode: "notify",
+      nextRunAt: "2026-03-15T09:30:00.000Z",
+      lastRunAt: "2026-03-15T09:15:00.000Z",
+      lastRunState: "ok",
+      overdue: false,
+      source: "mock",
+      evidenceRefs: [{ kind: "field", value: "mock.cron.Workspace Heartbeat" }],
+    },
+    {
+      id: "mock-cron-2",
+      name: "Escalation Sweep",
+      scheduleText: "0 * * * *",
+      timezone: "UTC",
+      enabled: true,
+      sessionTarget: "session:ops:alerts",
+      deliveryMode: "broadcast",
+      nextRunAt: "2026-03-15T08:00:00.000Z",
+      lastRunAt: "2026-03-15T07:00:00.000Z",
+      lastRunState: "error",
+      overdue: true,
+      source: "mock",
+      evidenceRefs: [{ kind: "field", value: "mock.cron.Escalation Sweep" }],
+    },
+  ];
+}
+
+function buildMockCronJobDetail(id: string): CronJobDetailDto | undefined {
+  const summary = buildMockCronJobs().find((job) => job.id === id);
+
+  if (!summary) {
+    return undefined;
+  }
+
+  return {
+    ...summary,
+    warnings: summary.overdue ? ["Mock scenario marks this cron as overdue."] : [],
+    recentRuns:
+      summary.id === "mock-cron-2"
+        ? [
+            {
+              runId: "run-err-1",
+              startedAt: "2026-03-15T07:00:00.000Z",
+              finishedAt: "2026-03-15T07:00:12.000Z",
+              state: "error",
+              summary: "Gateway ping timed out.",
+            },
+          ]
+        : [
+            {
+              runId: "run-ok-1",
+              startedAt: "2026-03-15T09:15:00.000Z",
+              finishedAt: "2026-03-15T09:15:04.000Z",
+              state: "ok",
+              summary: "Completed normally.",
+            },
+          ],
+  };
 }
 
 function buildEmptyLevelCounts(): Record<LogLevel, number> {

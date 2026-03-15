@@ -4,6 +4,8 @@ import {
   createCollectionMetadata,
   createResponseMeta,
   type CollectionMetadata,
+  type CronJobResponse,
+  type CronJobsResponse,
   type CoverageResponse,
   type CollectionStatus,
   type CollectionFreshness,
@@ -17,6 +19,7 @@ import {
   type RecommendationResponse,
   type RecommendationsResponse,
   type RuntimeStatus,
+  type RuntimeStatusResponse,
   type RisksSummaryResponse,
   type RuntimeStatusesResponse,
   type SnapshotSource,
@@ -48,6 +51,17 @@ interface FindingQuery {
 
 interface RecommendationQuery {
   findingId?: string;
+}
+
+interface CronQuery {
+  source?: string;
+  status?: string;
+  q?: string;
+}
+
+interface NodeQuery {
+  q?: string;
+  status?: string;
 }
 
 export class OverlayService {
@@ -252,7 +266,7 @@ export class OverlayService {
   }
 
   getNodes(): Promise<NodesResponse> {
-    return this.sidecarClient.getNodes();
+    return this.getNodeSummaries();
   }
 
   getTools(): Promise<ToolsResponse> {
@@ -273,6 +287,96 @@ export class OverlayService {
 
   getTopology() {
     return this.sidecarClient.getTopology();
+  }
+
+  async getRuntimeStatus(): Promise<RuntimeStatusResponse> {
+    const response = await this.sidecarClient.getRuntimeStatus();
+
+    return createItemResponse(response.data, buildApiMeta(response.meta));
+  }
+
+  async getCronJobs(query: CronQuery = {}): Promise<CronJobsResponse> {
+    const response = await this.sidecarClient.getCronJobs();
+    const items = response.data.filter((job) => {
+      if (query.source && query.source !== "all" && job.source !== query.source) {
+        return false;
+      }
+
+      if (query.status === "enabled" && !job.enabled) {
+        return false;
+      }
+
+      if (query.status === "disabled" && job.enabled) {
+        return false;
+      }
+
+      if (query.status === "overdue" && !job.overdue) {
+        return false;
+      }
+
+      if (query.status === "failing" && job.lastRunState !== "error") {
+        return false;
+      }
+
+      if (query.q) {
+        const needle = query.q.toLowerCase();
+        const haystack = [job.id, job.name, job.scheduleText, job.sessionTarget, job.deliveryMode].filter(Boolean).join(" ").toLowerCase();
+        if (!haystack.includes(needle)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return createListResponse(items, buildApiMeta(response.meta));
+  }
+
+  async getCronJob(id: string): Promise<CronJobResponse | undefined> {
+    const response = await this.sidecarClient.getCronJob(id);
+
+    if (!response) {
+      return undefined;
+    }
+
+    return createItemResponse(response.data, buildApiMeta(response.meta));
+  }
+
+  async getNodeSummaries(query: NodeQuery = {}): Promise<NodesResponse> {
+    const response = await this.sidecarClient.getNodes();
+    const items = response.data.filter((node) => {
+      if (query.status === "connected" && !node.connected) {
+        return false;
+      }
+
+      if (query.status === "paired" && !node.paired) {
+        return false;
+      }
+
+      if (query.status === "stale" && (node.connected || !node.paired)) {
+        return false;
+      }
+
+      if (query.q) {
+        const needle = query.q.toLowerCase();
+        const haystack = [node.id, node.name, node.platform, ...(node.capabilities ?? [])].filter(Boolean).join(" ").toLowerCase();
+        if (!haystack.includes(needle)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+    const list = createListResponse(items, buildApiMeta(response.meta));
+
+    return {
+      ...list,
+      summary: {
+        paired: items.filter((node) => node.paired).length,
+        connected: items.filter((node) => node.connected).length,
+        stale: items.filter((node) => node.paired && !node.connected).length,
+      },
+    };
   }
 
   async getRuntimeStatuses(): Promise<RuntimeStatusesResponse> {
