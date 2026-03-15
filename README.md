@@ -4,7 +4,7 @@
 
 ## 中文
 
-OpenClaw Team Ops Console 当前是一套面向内部评审的 **v0.2 alpha 治理预览版**：
+OpenClaw Team Ops Console 当前是一套面向内部评审的 **v0.3 alpha 治理预览版**：
 
 - 独立运行，不依赖修改 OpenClaw core
 - 严格只读，不提供写回、控制、终止、编辑、创建等能力
@@ -225,7 +225,7 @@ cp .env.example .env
 corepack pnpm dev
 ```
 
-`.env.example` 现在就是唯一的默认入口：直接复制后可跑 `mock-first`，想接真实 OpenClaw runtime 时只需要把 `OPENCLAW_STATE_DIR=/path/to/your/.openclaw` 改成你的本地路径。更详细的说明见 [docs/env.md](docs/env.md)。
+`.env.example` 现在就是唯一的默认入口（已内置详尽的中英文说明与开箱即用的默认值）：直接复制后可跑 `mock-first` 并体验完整的控制台展示，想接真实 OpenClaw runtime 时只需要把 `OPENCLAW_STATE_DIR=/path/to/your/.openclaw` 改成你的本地路径。更详细的说明见 [docs/env.md](docs/env.md)。
 
 默认本地地址：
 
@@ -283,7 +283,7 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 
 ### 环境变量与模式说明
 
-- `.env.example`：唯一默认模板
+- `.env.example`：唯一默认模板（内附中英文配置说明与开箱即用的默认演示值）
 - `OPENCLAW_STATE_DIR`：改成真实路径后切到 filesystem 只读模式；保留 `/path/to/your/.openclaw` 则继续走 mock
 - `SIDECAR_TARGETS_FILE`：多 target 注册表入口
 - 更多变量说明见 [docs/env.md](docs/env.md)
@@ -330,9 +330,9 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 - `GET /api/topology`
 - `GET /api/runtime-status`
 
-### v0.2 scope
+### v0.3 scope
 
-v0.2 当前聚焦：
+v0.3 当前聚焦：
 
 - Target Registry
 - Evidence / Findings / Risks 治理链路
@@ -375,18 +375,18 @@ docker compose -f docker-compose.filesystem.yml config
 - [docs/deployment-local.md](docs/deployment-local.md)
 - [docs/local-path-integration.md](docs/local-path-integration.md)
 - [docs/mock-scenarios.md](docs/mock-scenarios.md)
-- [docs/roadmap-v0.2.md](docs/roadmap-v0.2.md)
+- [docs/roadmap-v0.3.md](docs/roadmap-v0.3.md)
 - [docs/why-governance-not-control.md](docs/why-governance-not-control.md)
-- [docs/v0.2-changelog.md](docs/v0.2-changelog.md)
-- [docs/v0.2-api-examples.md](docs/v0.2-api-examples.md)
-- [docs/v0.2-demo-scenarios.md](docs/v0.2-demo-scenarios.md)
-- [docs/v0.2-known-limitations.md](docs/v0.2-known-limitations.md)
-- [docs/v0.2-information-architecture.md](docs/v0.2-information-architecture.md)
-- [docs/v0.2-governance-flow.md](docs/v0.2-governance-flow.md)
-- [docs/v0.2-dto-changes.md](docs/v0.2-dto-changes.md)
-- [docs/v0.2-api-changes.md](docs/v0.2-api-changes.md)
-- [docs/v0.2-validation-log.md](docs/v0.2-validation-log.md)
-- [docs/v0.2-acceptance-checklist.md](docs/v0.2-acceptance-checklist.md)
+- [docs/v0.3-changelog.md](docs/v0.3-changelog.md)
+- [docs/v0.3-api-examples.md](docs/v0.3-api-examples.md)
+- [docs/v0.3-demo-scenarios.md](docs/v0.3-demo-scenarios.md)
+- [docs/v0.3-known-limitations.md](docs/v0.3-known-limitations.md)
+- [docs/v0.3-information-architecture.md](docs/v0.3-information-architecture.md)
+- [docs/v0.3-governance-flow.md](docs/v0.3-governance-flow.md)
+- [docs/v0.3-dto-changes.md](docs/v0.3-dto-changes.md)
+- [docs/v0.3-api-changes.md](docs/v0.3-api-changes.md)
+- [docs/v0.3-validation-log.md](docs/v0.3-validation-log.md)
+- [docs/v0.3-acceptance-checklist.md](docs/v0.3-acceptance-checklist.md)
 
 ### 已知限制
 
@@ -400,7 +400,7 @@ docker compose -f docker-compose.filesystem.yml config
 
 ## English
 
-OpenClaw Team Ops Console currently ships as a **v0.2 alpha governance preview** for internal evaluation:
+OpenClaw Team Ops Console currently ships as a **v0.3 alpha governance preview** for internal evaluation:
 
 - standalone, with no OpenClaw core changes required
 - strictly read-only
@@ -579,7 +579,7 @@ cp .env.example .env
 corepack pnpm dev
 ```
 
-`.env.example` is now the one default entrypoint: copy it and you get `mock-first` startup, then replace `OPENCLAW_STATE_DIR=/path/to/your/.openclaw` only when you want real local OpenClaw data. More detail lives in [docs/env.md](docs/env.md).
+`.env.example` is now the one default entrypoint (featuring detailed bilingual instructions and out-of-the-box default values): copy it and you get a complete `mock-first` startup, then replace `OPENCLAW_STATE_DIR=/path/to/your/.openclaw` only when you want real local OpenClaw data. More detail lives in [docs/env.md](docs/env.md)。.
 
 Default local URLs:
 
@@ -624,7 +624,7 @@ docker compose -f docker-compose.filesystem.yml down --remove-orphans
 
 ### Env templates and mode selection
 
-- `.env.example`: the single default template
+- `.env.example`: the single default template (includes bilingual comments and out-of-the-box defaults)
 - `OPENCLAW_STATE_DIR`: switch to real read-only filesystem mode by replacing the placeholder path
 - `SIDECAR_TARGETS_FILE`: multi-target registry mode
 - the rest of the env rules are documented in [docs/env.md](docs/env.md)
@@ -673,7 +673,7 @@ On Linux/WSL, `corepack pnpm test:e2e` automatically prepares a small local libr
 
 ### Known limitations
 
-- v0.2 alpha / governance preview only
+- v0.3 alpha / governance preview only
 - filesystem remains the base adapter; gateway-ws now augments the runtime plane with read-only `operator.read`
 - only one minimal browser-level E2E is in place today
 - browser-level screenshots are still pending
