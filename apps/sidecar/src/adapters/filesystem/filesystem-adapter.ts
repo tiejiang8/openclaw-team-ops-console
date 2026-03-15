@@ -2486,6 +2486,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         warnings,
       }, [
         logDiscovery.collectionStatus,
+        await this.discoverCronConfig(resolved),
         ...(gatewayRuntime.configured
           ? [
               createGatewayCollectionStatus("presence", gatewayCollections.presence, gatewayRuntime.fetchedAt),
@@ -2804,6 +2805,51 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       observedAt: snapshot.generatedAt,
       details: `agents=${snapshot.agents.length} workspaces=${snapshot.workspaces.length} sessions=${snapshot.sessions.length} source=${snapshot.source}`,
       warnings: snapshot.warnings,
+    };
+  }
+
+  private async discoverCronConfig(
+    resolved: ResolvedFilesystemPaths,
+  ): Promise<SourceCollectionStatus> {
+    const cronDir = resolved.runtimeRoot ? path.join(resolved.runtimeRoot, "cron") : undefined;
+
+    if (!cronDir) {
+      return {
+        key: "cron",
+        sourceKind: "filesystem",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 0,
+      };
+    }
+
+    try {
+      const stats = await stat(cronDir);
+      if (stats.isDirectory()) {
+        const files = await readdir(cronDir);
+        const hasConfig = files.some(
+          (f) => f.endsWith(".json") || f.endsWith(".yaml") || f.endsWith(".yml"),
+        );
+        if (hasConfig) {
+          return {
+            key: "cron",
+            sourceKind: "filesystem",
+            freshness: "fresh",
+            coverage: "complete",
+            warningCount: 0,
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return {
+      key: "cron",
+      sourceKind: "filesystem",
+      freshness: "unknown",
+      coverage: "unavailable",
+      warningCount: 0,
     };
   }
 
