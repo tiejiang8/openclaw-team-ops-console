@@ -7,7 +7,14 @@ import type {
   Evidence,
   Finding,
   InventorySummary,
+  LogEntriesPage,
+  LogFile,
+  LogRawFile,
+  LogSummary,
+  Node,
   Recommendation,
+  Plugin,
+  PresenceEntry,
   RisksSummary,
   RuntimeStatus,
   Session,
@@ -17,25 +24,24 @@ import type {
   Target,
   TargetSnapshotSummary,
   TopologyView,
+  Tool,
   Workspace,
   WorkspaceDocument,
 } from "./domain.js";
+import type { ApiMeta, CoverageSummary } from "./observability.js";
 
-export interface ResponseMeta {
-  generatedAt: string;
-  source: SnapshotSource;
-  readOnly: true;
-  collections?: Partial<Record<CollectionName, CollectionMetadata>>;
-  warnings?: SnapshotWarning[];
-}
+export interface ResponseMeta extends ApiMeta {}
 
 export interface ListResponse<T> {
   data: T[];
+  items: T[];
+  total: number;
   meta: ResponseMeta & { count: number };
 }
 
 export interface ItemResponse<T> {
   data: T;
+  item: T;
   meta: ResponseMeta;
 }
 
@@ -78,6 +84,7 @@ export interface TopologyResponse {
 
 export interface SnapshotResponse {
   data: SystemSnapshot;
+  item: SystemSnapshot;
   meta: ResponseMeta;
 }
 
@@ -98,3 +105,12 @@ export type WorkspaceDocumentResponse = ItemResponse<WorkspaceDocument>;
 export type SessionsResponse = ListResponse<Session>;
 export type BindingsResponse = ListResponse<BindingRoute>;
 export type AuthProfilesResponse = ListResponse<AuthProfile>;
+export type CoverageResponse = ItemResponse<CoverageSummary>;
+export type LogFilesResponse = ListResponse<LogFile>;
+export type LogSummaryResponse = ItemResponse<LogSummary>;
+export type LogEntriesResponse = ItemResponse<LogEntriesPage>;
+export type LogRawFileResponse = ItemResponse<LogRawFile>;
+export type PresenceResponse = ListResponse<PresenceEntry>;
+export type NodesResponse = ListResponse<Node>;
+export type ToolsResponse = ListResponse<Tool>;
+export type PluginsResponse = ListResponse<Plugin>;

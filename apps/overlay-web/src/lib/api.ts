@@ -3,11 +3,17 @@ import type {
   AgentsResponse,
   AuthProfilesResponse,
   BindingsResponse,
+  CoverageResponse,
   EvidenceResponse,
   EvidencesResponse,
   FindingResponse,
   FindingsResponse,
   HealthResponse,
+  LogEntriesQuery,
+  LogEntriesResponse,
+  LogFilesResponse,
+  LogRawFileResponse,
+  LogSummaryResponse,
   RecommendationResponse,
   RecommendationsResponse,
   RisksSummaryResponse,
@@ -69,6 +75,27 @@ export const overlayApi = {
   getRecommendation: (recommendationId: string) =>
     request<RecommendationResponse>(`/api/recommendations/${encodeURIComponent(recommendationId)}`),
   getRisksSummary: () => request<RisksSummaryResponse>("/api/risks/summary"),
+  getCoverage: () => request<CoverageResponse>("/api/coverage"),
+  getLogFiles: () => request<LogFilesResponse>("/api/logs/files"),
+  getLogSummary: (date?: string) =>
+    request<LogSummaryResponse>(
+      withQuery("/api/logs/summary", {
+        ...(date ? { date } : {}),
+      }),
+    ),
+  getLogEntries: (query: LogEntriesQuery = {}) =>
+    request<LogEntriesResponse>(
+      withQuery("/api/logs/entries", {
+        ...(query.date ? { date: query.date } : {}),
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+        ...(typeof query.limit === "number" ? { limit: String(query.limit) } : {}),
+        ...(query.q ? { q: query.q } : {}),
+        ...(query.level ? { level: query.level } : {}),
+        ...(query.subsystem ? { subsystem: query.subsystem } : {}),
+        ...(query.tag ? { tag: query.tag } : {}),
+      }),
+    ),
+  getLogRawFile: (date: string) => request<LogRawFileResponse>(`/api/logs/files/${encodeURIComponent(date)}/raw`),
   getAgents: () => request<AgentsResponse>("/api/agents"),
   getAgent: (agentId: string) => request<AgentResponse>(`/api/agents/${encodeURIComponent(agentId)}`),
   getWorkspaces: () => request<WorkspacesResponse>("/api/workspaces"),

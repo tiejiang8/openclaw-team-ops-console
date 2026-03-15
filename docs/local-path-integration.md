@@ -23,6 +23,8 @@ The sidecar switches from mock mode to filesystem mode when any of these are set
 
 `OPENCLAW_SOURCE_ROOT` is informational only. It does not activate the filesystem adapter by itself.
 
+The placeholder example path `/path/to/your/.openclaw` is treated as unset on purpose, so copying `.env.example` still keeps the sidecar in mock mode until you replace that path with a real one.
+
 ## Environment Variables
 
 ### `OPENCLAW_RUNTIME_ROOT`
@@ -177,8 +179,6 @@ This makes missing runtime paths visible to operators without silently falling b
 
 ```bash
 OPENCLAW_STATE_DIR=~/.openclaw \
-OPENCLAW_CONFIG_PATH=~/.openclaw/openclaw.json \
-OPENCLAW_WORKSPACE_GLOB='~/.openclaw/workspace*' \
 OPENCLAW_SOURCE_ROOT=~/openclaw \
 corepack pnpm dev
 ```
@@ -188,8 +188,6 @@ Optional explicit config path:
 ```bash
 OPENCLAW_PROFILE=dev \
 OPENCLAW_STATE_DIR=~/.openclaw-dev \
-OPENCLAW_CONFIG_PATH=~/.openclaw-dev/openclaw.json \
-OPENCLAW_WORKSPACE_GLOB='~/.openclaw/workspace*' \
 corepack pnpm dev
 ```
 
@@ -198,15 +196,14 @@ corepack pnpm dev
 The repository also provides a filesystem-backed compose path for real OpenClaw read-only evaluation:
 
 ```bash
-cp .env.filesystem.example .env.filesystem
-# update the placeholder host paths in .env.filesystem before starting
-docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+cp .env.example .env
+# replace OPENCLAW_STATE_DIR with your real local OpenClaw path first
+docker compose -f docker-compose.filesystem.yml up --build
 ```
 
 Container notes:
 
 - the sidecar container uses `OPENCLAW_STATE_DIR=/openclaw-state`
-- `OPENCLAW_CONFIG_PATH` defaults to `/openclaw-state/openclaw.json`
 - `OPENCLAW_PROFILE` stays optional
-- `OPENCLAW_WORKSPACE_GLOB` is optional and defaults to `/openclaw-state/workspace*`
-- host state and workspace paths are bind-mounted read-only
+- config and workspace defaults are derived from `/openclaw-state`
+- the host OpenClaw state path is bind-mounted read-only

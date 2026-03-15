@@ -1,23 +1,34 @@
 import {
+  createItemResponse,
+  createListResponse,
   createCollectionMetadata,
   createResponseMeta,
   type CollectionMetadata,
+  type CoverageResponse,
+  type CollectionStatus,
+  type CollectionFreshness,
   type EvidenceResponse,
   type EvidencesResponse,
   type FindingResponse,
   type FindingsResponse,
+  type NodesResponse,
+  type PluginsResponse,
+  type PresenceResponse,
   type RecommendationResponse,
   type RecommendationsResponse,
   type RuntimeStatus,
   type RisksSummaryResponse,
   type RuntimeStatusesResponse,
   type SnapshotSource,
+  type SourceKind,
   type SummaryResponse,
   type Target,
   type TargetSnapshotSummary,
+  type ToolsResponse,
 } from "@openclaw-team-ops/shared";
 
 import { SidecarClient } from "../clients/sidecar-client.js";
+import { buildApiMeta } from "./api-meta.js";
 import { buildGovernanceDataset } from "./governance-engine.js";
 
 interface EvidenceQuery {
@@ -72,7 +83,12 @@ export class OverlayService {
       data: summary.data,
       runtimeStatuses,
       meta: {
-        ...summary.meta,
+        ...buildApiMeta(summary.meta, {
+          collections: {
+            ...summary.meta.collections,
+            runtimeStatuses: runtimeMetadata,
+          },
+        }),
         collections: {
           ...summary.meta.collections,
           runtimeStatuses: runtimeMetadata,
@@ -83,6 +99,18 @@ export class OverlayService {
 
   getTargets() {
     return this.sidecarClient.getTargets();
+  }
+
+  async getCoverage(): Promise<CoverageResponse> {
+    const coverage = await this.sidecarClient.getCoverage();
+
+    return createItemResponse(
+      coverage.data,
+      buildApiMeta(coverage.meta, {
+        ...(coverage.meta.collections ? { collections: coverage.meta.collections } : {}),
+        collectionStatuses: coverage.data.collections,
+      }),
+    );
   }
 
   getTargetById(targetId: string) {
@@ -119,13 +147,7 @@ export class OverlayService {
       return true;
     });
 
-    return {
-      data,
-      meta: {
-        ...createResponseMeta(governance.generatedAt, governance.source),
-        count: data.length,
-      },
-    };
+    return createListResponse(data, governance.meta);
   }
 
   async getEvidenceById(evidenceId: string): Promise<EvidenceResponse | undefined> {
@@ -136,10 +158,7 @@ export class OverlayService {
       return undefined;
     }
 
-    return {
-      data: evidence,
-      meta: createResponseMeta(governance.generatedAt, governance.source),
-    };
+    return createItemResponse(evidence, governance.meta);
   }
 
   async getFindings(query: FindingQuery = {}): Promise<FindingsResponse> {
@@ -164,13 +183,7 @@ export class OverlayService {
       return true;
     });
 
-    return {
-      data,
-      meta: {
-        ...createResponseMeta(governance.generatedAt, governance.source),
-        count: data.length,
-      },
-    };
+    return createListResponse(data, governance.meta);
   }
 
   async getFindingById(findingId: string): Promise<FindingResponse | undefined> {
@@ -181,10 +194,7 @@ export class OverlayService {
       return undefined;
     }
 
-    return {
-      data: finding,
-      meta: createResponseMeta(governance.generatedAt, governance.source),
-    };
+    return createItemResponse(finding, governance.meta);
   }
 
   async getRecommendations(query: RecommendationQuery = {}): Promise<RecommendationsResponse> {
@@ -197,13 +207,7 @@ export class OverlayService {
       return true;
     });
 
-    return {
-      data,
-      meta: {
-        ...createResponseMeta(governance.generatedAt, governance.source),
-        count: data.length,
-      },
-    };
+    return createListResponse(data, governance.meta);
   }
 
   async getRecommendationById(recommendationId: string): Promise<RecommendationResponse | undefined> {
@@ -214,19 +218,13 @@ export class OverlayService {
       return undefined;
     }
 
-    return {
-      data: recommendation,
-      meta: createResponseMeta(governance.generatedAt, governance.source),
-    };
+    return createItemResponse(recommendation, governance.meta);
   }
 
   async getRisksSummary(): Promise<RisksSummaryResponse> {
     const governance = await this.collectGovernanceData();
 
-    return {
-      data: governance.dataset.risksSummary,
-      meta: createResponseMeta(governance.generatedAt, governance.source),
-    };
+    return createItemResponse(governance.dataset.risksSummary, governance.meta);
   }
 
   getAgents() {
@@ -249,6 +247,22 @@ export class OverlayService {
     return this.sidecarClient.getSessions();
   }
 
+  getPresence(): Promise<PresenceResponse> {
+    return this.sidecarClient.getPresence();
+  }
+
+  getNodes(): Promise<NodesResponse> {
+    return this.sidecarClient.getNodes();
+  }
+
+  getTools(): Promise<ToolsResponse> {
+    return this.sidecarClient.getTools();
+  }
+
+  getPlugins(): Promise<PluginsResponse> {
+    return this.sidecarClient.getPlugins();
+  }
+
   getBindings() {
     return this.sidecarClient.getBindings();
   }
@@ -263,21 +277,21 @@ export class OverlayService {
 
   async getRuntimeStatuses(): Promise<RuntimeStatusesResponse> {
     const summary = await this.getSummary();
-    return {
-      data: summary.runtimeStatuses,
-      meta: createResponseMeta(summary.meta.generatedAt, summary.meta.source, {
+    return createListResponse(
+      summary.runtimeStatuses,
+      buildApiMeta(summary.meta, {
         ...(summary.meta.collections?.runtimeStatuses
           ? { collections: { runtimeStatuses: summary.meta.collections.runtimeStatuses } }
           : {}),
-        ...(summary.meta.warnings ? { warnings: summary.meta.warnings } : {}),
       }),
-    };
+    );
   }
 
   private async collectGovernanceData(): Promise<{
     dataset: ReturnType<typeof buildGovernanceDataset>;
     generatedAt: string;
     source: SnapshotSource;
+    meta: ReturnType<typeof createResponseMeta>;
   }> {
     const targetsResponse = await this.sidecarClient.getTargets();
     const targets = targetsResponse.data;
@@ -292,10 +306,14 @@ export class OverlayService {
 
     const dataset = buildGovernanceDataset(targetSummaries);
 
+    const generatedAt = this.latestGovernanceTimestamp(targets, targetSummaries);
+    const source = this.detectGovernanceSource(targets);
+
     return {
       dataset,
-      generatedAt: this.latestGovernanceTimestamp(targets, targetSummaries),
-      source: this.detectGovernanceSource(targets),
+      generatedAt,
+      source,
+      meta: this.buildGovernanceMeta(targets, targetSummaries, generatedAt, source),
     };
   }
 
@@ -328,5 +346,60 @@ export class OverlayService {
     return timestamps.length > 0 && typeof timestamps[0] === "number"
       ? new Date(timestamps[0]).toISOString()
       : new Date().toISOString();
+  }
+
+  private buildGovernanceMeta(
+    targets: Target[],
+    targetSummaries: TargetSnapshotSummary[],
+    generatedAt: string,
+    source: SnapshotSource,
+  ) {
+    const sourceKinds = Array.from(
+      new Set(
+        targets.map((target) => {
+          switch (target.sourceKind) {
+            case "filesystem":
+            case "logs":
+              return "filesystem" as const;
+            case "cli":
+              return "cli-probe" as const;
+            case "gateway-health":
+              return "gateway-ws" as const;
+            case "mock":
+            default:
+              return "mock" as const;
+          }
+        }),
+      ),
+    ) as SourceKind[];
+    const freshnessValues = targets.map((target) => target.freshness);
+    const freshness: CollectionFreshness = freshnessValues.includes("stale")
+      ? "stale"
+      : freshnessValues.includes("fresh")
+        ? "fresh"
+        : "unknown";
+    const coverage: CollectionStatus =
+      targets.length === 0
+        ? "unavailable"
+        : targets.every((target) => target.coverage.partialCollections === 0 && target.coverage.unavailableCollections === 0)
+          ? "complete"
+          : targets.every(
+                (target) =>
+                  target.coverage.completeCollections === 0 &&
+                  target.coverage.partialCollections === 0 &&
+                  target.coverage.unavailableCollections > 0,
+              )
+            ? "unavailable"
+            : "partial";
+    const warnings = targetSummaries.flatMap((targetSummary) => targetSummary.warnings);
+    const warningCount = targets.reduce((count, target) => count + target.warningCount, 0);
+
+    return buildApiMeta(createResponseMeta(generatedAt, source), {
+      sourceKinds,
+      freshness,
+      coverage,
+      warnings: warnings.slice(0, 50),
+      warningCount,
+    });
   }
 }

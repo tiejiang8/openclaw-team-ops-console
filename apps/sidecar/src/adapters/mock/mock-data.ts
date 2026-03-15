@@ -15,6 +15,8 @@ import {
   type WorkspaceDocument,
 } from "@openclaw-team-ops/shared";
 
+import { buildSourceRegistry } from "../../domain/source-registry.js";
+
 export const MOCK_SCENARIOS = ["baseline", "partial-coverage", "stale-observability"] as const;
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
 
@@ -567,6 +569,34 @@ function assembleSnapshot(
       topology.nodes.length + topology.edges.length,
       collectionOverrides,
     ),
+    sourceRegistry: buildSourceRegistry({
+      source: "mock",
+      generatedAt,
+      origin: {
+        adapterName: "MockOpenClawAdapter",
+        mode: "mock",
+        collectedAt: generatedAt,
+        sources: [
+          {
+            id: `mock:${scenario}`,
+            displayName: `Mock Scenario: ${scenario}`,
+            kind: "mock",
+            readOnly: true,
+            confidence: "confirmed",
+            location: MOCK_SOURCE_LOCATION,
+            notes: scenarioNotes(scenario),
+          },
+        ],
+      },
+      collections: buildCollections(
+        generatedAt,
+        scenario,
+        fixture,
+        topology.nodes.length + topology.edges.length,
+        collectionOverrides,
+      ),
+      warnings,
+    }),
     warnings,
     agents: fixture.agents,
     workspaces: fixture.workspaces,

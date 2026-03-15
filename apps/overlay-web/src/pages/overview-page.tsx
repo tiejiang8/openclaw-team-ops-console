@@ -2,7 +2,9 @@ import { useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
+import { CoverageBadge } from "../components/coverage-badge.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
@@ -12,11 +14,12 @@ import { useResource } from "../lib/use-resource.js";
 export function OverviewPage() {
   const { language, t, translateComponentType, translateFreshness, translateSignal, translateTargetSourceKind } = useI18n();
   const loadOverview = useCallback(async () => {
-    const [health, summary, targets, risksSummary] = await Promise.all([
+    const [health, summary, targets, risksSummary, coverage] = await Promise.all([
       overlayApi.getHealth(),
       overlayApi.getSummary(),
       overlayApi.getTargets(),
       overlayApi.getRisksSummary(),
+      overlayApi.getCoverage(),
     ]);
 
     return {
@@ -24,6 +27,7 @@ export function OverviewPage() {
       summary,
       targets,
       risksSummary,
+      coverage,
     };
   }, []);
 
@@ -36,6 +40,7 @@ export function OverviewPage() {
 
     return [
       { to: "/targets", label: t("nav.targets"), count: data.targets.data.length },
+      { to: "/coverage", label: t("nav.coverage"), count: data.coverage.data.collections.length },
       { to: "/agents", label: t("nav.agents"), count: data.summary.data.totals.agents },
       { to: "/workspaces", label: t("nav.workspaces"), count: data.summary.data.totals.workspaces },
       { to: "/sessions", label: t("nav.sessions"), count: data.summary.data.totals.sessions },
@@ -69,6 +74,8 @@ export function OverviewPage() {
         <h2>{t("overview.title")}</h2>
         <p>{t("overview.description")}</p>
       </header>
+
+      <PageObservability meta={data?.summary.meta} />
 
       <DataState
         loading={loading}
@@ -104,6 +111,7 @@ export function OverviewPage() {
               />
               <MetricCard label={t("overview.metric.bindings")} value={data.summary.data.totals.bindings} />
               <MetricCard label={t("overview.metric.authProfiles")} value={data.summary.data.totals.authProfiles} />
+              <MetricCard label={t("overview.metric.coverageCollections")} value={data.coverage.data.collections.length} />
               <MetricCard label={t("overview.metric.snapshotTime")} value={formatTimestamp(data.summary.meta.generatedAt, language)} />
             </div>
 
@@ -158,6 +166,33 @@ export function OverviewPage() {
                     </div>
                   </Link>
                 ))}
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <h3>{t("overview.coverageTitle")}</h3>
+                <p>{t("overview.coverageDescription")}</p>
+              </div>
+
+              <div className="target-grid">
+                <Link className="target-card" to="/coverage">
+                  <div className="target-card-header">
+                    <div>
+                      <div className="cell-title">{t("coverage.panelTitle")}</div>
+                      <div className="cell-subtitle">{data.coverage.data.collections.length}</div>
+                    </div>
+                    <CoverageBadge coverage={data.coverage.meta.coverage} />
+                  </div>
+                  <div className="target-card-meta">
+                    <span>{t("coverage.metric.complete")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "complete").length}</span>
+                    <span>{t("coverage.metric.partial")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "partial").length}</span>
+                  </div>
+                  <div className="target-card-stats">
+                    <span>{t("coverage.metric.unavailable")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "unavailable").length}</span>
+                    <span>{t("common.warnings")}: {data.coverage.data.collections.reduce((count, collection) => count + collection.warningCount, 0)}</span>
+                  </div>
+                </Link>
               </div>
             </div>
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 
 import { DataState } from "../components/data-state.js";
+import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
@@ -44,6 +45,7 @@ export function AuthProfilesPage() {
       authProfiles: authProfilesResponse.data,
       workspaces: workspacesResponse.data,
       agents: agentsResponse.data,
+      meta: authProfilesResponse.meta,
     };
   }, []);
 
@@ -133,6 +135,8 @@ export function AuthProfilesPage() {
         <h2>{t("authProfiles.title")}</h2>
         <p>{t("authProfiles.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input

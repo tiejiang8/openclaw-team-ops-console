@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 
 import { DataState } from "../components/data-state.js";
+import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
@@ -47,6 +48,7 @@ export function BindingsPage() {
       bindings: bindingsResponse.data,
       agents: agentsResponse.data,
       workspaces: workspacesResponse.data,
+      meta: bindingsResponse.meta,
     };
   }, []);
 
@@ -127,6 +129,8 @@ export function BindingsPage() {
         <h2>{t("bindings.title")}</h2>
         <p>{t("bindings.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input

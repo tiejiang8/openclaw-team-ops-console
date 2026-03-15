@@ -56,9 +56,9 @@ Then open:
 Use this path when you want the container stack to read a real local OpenClaw runtime in read-only mode:
 
 ```bash
-cp .env.filesystem.example .env.filesystem
-# update the placeholder host paths in .env.filesystem before starting
-docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+cp .env.example .env
+# replace OPENCLAW_STATE_DIR with your real local OpenClaw path first
+docker compose -f docker-compose.filesystem.yml up --build
 ```
 
 Then open:
@@ -67,9 +67,8 @@ Then open:
 
 Notes:
 
-- sidecar prefers `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, and `OPENCLAW_PROFILE`
-- `OPENCLAW_WORKSPACE_GLOB` stays optional
-- host state and workspace paths are mounted read-only only
+- sidecar prefers `OPENCLAW_STATE_DIR` and derives config/workspace defaults from it
+- host state paths are mounted read-only only
 
 ## Recommended reviewer path
 

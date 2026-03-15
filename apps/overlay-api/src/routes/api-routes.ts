@@ -2,15 +2,21 @@ import { createResponseMeta, type ErrorResponse, type HealthResponse } from "@op
 import express, { type Router } from "express";
 
 import { SidecarClient } from "../clients/sidecar-client.js";
+import { createLogsRouter } from "../routes/logs.js";
+import { buildApiMeta } from "../services/api-meta.js";
+import { LogsService } from "../services/logs-service.js";
 import { OverlayService } from "../services/overlay-service.js";
 
 export function createApiRouter(service: OverlayService, sidecarClient: SidecarClient): Router {
   const router = express.Router();
+  const logsService = new LogsService(sidecarClient);
 
   router.use((_request, response, next) => {
     response.setHeader("x-openclaw-ops-readonly", "true");
     next();
   });
+
+  router.use(createLogsRouter(logsService));
 
   router.get("/health", async (_request, response) => {
     try {
@@ -85,7 +91,7 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
             code: "TARGET_NOT_FOUND",
             message: `Target ${targetId} was not found`,
           },
-          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+          meta: buildApiMeta(createResponseMeta(new Date().toISOString(), "mixed")),
         };
 
         response.status(404).json(body);
@@ -136,6 +142,14 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
     }
   });
 
+  router.get("/api/coverage", async (_request, response, next) => {
+    try {
+      response.json(await service.getCoverage());
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/api/evidence/:id", async (request, response, next) => {
     try {
       const evidenceId = request.params.id ?? "";
@@ -147,7 +161,7 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
             code: "EVIDENCE_NOT_FOUND",
             message: `Evidence ${evidenceId} was not found`,
           },
-          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+          meta: buildApiMeta(createResponseMeta(new Date().toISOString(), "mixed")),
         };
 
         response.status(404).json(body);
@@ -184,7 +198,7 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
             code: "FINDING_NOT_FOUND",
             message: `Finding ${findingId} was not found`,
           },
-          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+          meta: buildApiMeta(createResponseMeta(new Date().toISOString(), "mixed")),
         };
 
         response.status(404).json(body);
@@ -218,7 +232,7 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
             code: "RECOMMENDATION_NOT_FOUND",
             message: `Recommendation ${recommendationId} was not found`,
           },
-          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+          meta: buildApiMeta(createResponseMeta(new Date().toISOString(), "mixed")),
         };
 
         response.status(404).json(body);
@@ -257,7 +271,7 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
             code: "AGENT_NOT_FOUND",
             message: `Agent ${request.params.id} was not found`,
           },
-          meta: createResponseMeta(new Date().toISOString(), "mixed"),
+          meta: buildApiMeta(createResponseMeta(new Date().toISOString(), "mixed")),
         };
 
         response.status(404).json(body);
@@ -306,6 +320,38 @@ export function createApiRouter(service: OverlayService, sidecarClient: SidecarC
   router.get("/api/sessions", async (_request, response, next) => {
     try {
       response.json(await service.getSessions());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/presence", async (_request, response, next) => {
+    try {
+      response.json(await service.getPresence());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/nodes", async (_request, response, next) => {
+    try {
+      response.json(await service.getNodes());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/tools", async (_request, response, next) => {
+    try {
+      response.json(await service.getTools());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api/plugins", async (_request, response, next) => {
+    try {
+      response.json(await service.getPlugins());
     } catch (error) {
       next(error);
     }

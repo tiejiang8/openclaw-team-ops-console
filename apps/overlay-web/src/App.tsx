@@ -4,10 +4,12 @@ import { ConsoleLayout } from "./layouts/console-layout.js";
 import { AgentsPage } from "./pages/agents-page.js";
 import { AuthProfilesPage } from "./pages/auth-profiles-page.js";
 import { BindingsPage } from "./pages/bindings-page.js";
+import { CoveragePage } from "./pages/coverage-page.js";
 import { EvidenceDetailPage } from "./pages/evidence-detail-page.js";
 import { EvidencePage } from "./pages/evidence-page.js";
 import { FindingDetailPage } from "./pages/finding-detail-page.js";
 import { FindingsPage } from "./pages/findings-page.js";
+import { LogsPage } from "./pages/logs-page.js";
 import { OverviewPage } from "./pages/overview-page.js";
 import { RisksPage } from "./pages/risks-page.js";
 import { SessionsPage } from "./pages/sessions-page.js";
@@ -24,6 +26,8 @@ export function App() {
           <Route path="/" element={<OverviewPage />} />
           <Route path="/targets" element={<TargetsPage />} />
           <Route path="/targets/:id" element={<TargetDetailPage />} />
+          <Route path="/coverage" element={<CoveragePage />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route path="/risks" element={<RisksPage />} />
           <Route path="/findings" element={<FindingsPage />} />
           <Route path="/findings/:id" element={<FindingDetailPage />} />

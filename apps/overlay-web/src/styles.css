@@ -160,6 +160,66 @@ body {
   overflow-wrap: anywhere;
 }
 
+.page-observability {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.meta-chip-readonly {
+  border-color: rgba(0, 109, 119, 0.28);
+  color: var(--accent);
+}
+
+.meta-chip-warning {
+  border-color: #e8cd86;
+  background: #fffbef;
+  color: #734f02;
+}
+
+.coverage-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.coverage-badge-complete {
+  background: var(--ok-soft);
+  border-color: #b8e2cf;
+  color: #186845;
+}
+
+.coverage-badge-partial {
+  background: var(--warning-soft);
+  border-color: #e8cd86;
+  color: #734f02;
+}
+
+.coverage-badge-unavailable {
+  background: var(--danger-soft);
+  border-color: #efb4bd;
+  color: #8a202d;
+}
+
 .nav-list {
   display: grid;
   gap: 8px;
@@ -870,6 +930,159 @@ th.cell-align-right {
   color: #8a202d;
 }
 
+.state-box-warning {
+  border-color: #e8cd86;
+  background: var(--warning-soft);
+  color: #734f02;
+}
+
+.log-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.log-filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.log-filter-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.log-entry-row-selected {
+  background: rgba(0, 109, 119, 0.06);
+}
+
+.log-entry-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.log-entry-message {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.log-level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 3px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.log-level-badge-error {
+  border-color: #efb4bd;
+  background: var(--danger-soft);
+  color: #8a202d;
+}
+
+.log-level-badge-warn {
+  border-color: #e8cd86;
+  background: var(--warning-soft);
+  color: #734f02;
+}
+
+.log-level-badge-info {
+  border-color: #b8e2cf;
+  background: var(--ok-soft);
+  color: #186845;
+}
+
+.log-level-badge-debug {
+  border-color: rgba(0, 109, 119, 0.22);
+  background: rgba(195, 237, 241, 0.65);
+  color: #0a5b63;
+}
+
+.log-level-badge-unknown {
+  border-color: var(--panel-border);
+  background: rgba(230, 237, 245, 0.85);
+  color: var(--text-secondary);
+}
+
+.log-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.log-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 109, 119, 0.18);
+  background: rgba(195, 237, 241, 0.55);
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  color: #0a5b63;
+}
+
+.log-detail-panel {
+  min-height: 100%;
+}
+
+.log-detail-body {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.log-detail-empty {
+  padding: 18px;
+}
+
+.log-raw-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.log-raw-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.log-raw-content {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(20, 36, 51, 0.96);
+  color: #f3f6fa;
+  padding: 14px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .state-retry-button {
   width: fit-content;
   border: 1px solid #d9929e;
@@ -916,6 +1129,10 @@ th.cell-align-right {
 
   .filter-row-spread {
     align-items: stretch;
+  }
+
+  .log-layout {
+    grid-template-columns: 1fr;
   }
 }
 

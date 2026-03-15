@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { SignalBadge } from "../components/signal-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatDetailEntries, resourcePathForSubject } from "../lib/governance.js";
@@ -26,7 +27,10 @@ export function EvidenceDetailPage() {
     }
 
     const evidenceResponse = await overlayApi.getEvidence(id);
-    return evidenceResponse.data;
+    return {
+      evidence: evidenceResponse.data,
+      meta: evidenceResponse.meta,
+    };
   }, [id]);
 
   const { data, loading, error, retry } = useResource(`evidence:${id ?? "missing"}`, loadEvidence);
@@ -37,46 +41,48 @@ export function EvidenceDetailPage() {
         <Link to="/evidence" className="back-link">
           {t("evidenceDetail.back")}
         </Link>
-        <h2>{data?.message ?? t("evidenceDetail.title")}</h2>
+        <h2>{data?.evidence.message ?? t("evidenceDetail.title")}</h2>
         <p>{t("evidenceDetail.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (
           <>
             <div className="metrics-grid">
-              <MetricCard label={t("evidence.table.kind")} value={translateEvidenceKind(data.kind)} />
-              <MetricCard label={t("evidence.table.severity")} value={<SignalBadge value={data.severity} />} />
-              <MetricCard label={t("evidence.table.freshness")} value={translateFreshness(data.freshness)} />
-              <MetricCard label={t("evidence.table.observed")} value={formatTimestamp(data.observedAt, language)} />
+              <MetricCard label={t("evidence.table.kind")} value={translateEvidenceKind(data.evidence.kind)} />
+              <MetricCard label={t("evidence.table.severity")} value={<SignalBadge value={data.evidence.severity} />} />
+              <MetricCard label={t("evidence.table.freshness")} value={translateFreshness(data.evidence.freshness)} />
+              <MetricCard label={t("evidence.table.observed")} value={formatTimestamp(data.evidence.observedAt, language)} />
             </div>
 
             <div className="detail-grid">
               <div className="panel">
                 <div className="panel-header">
                   <h3>{t("evidenceDetail.detailsTitle")}</h3>
-                  <p>{data.id}</p>
+                  <p>{data.evidence.id}</p>
                 </div>
 
                 <dl className="detail-list">
                   <div className="detail-list-row">
                     <dt>{t("evidence.table.target")}</dt>
                     <dd>
-                      <Link className="inline-link" to={`/targets/${data.targetId}`}>
-                        {data.targetName ?? data.targetId}
+                      <Link className="inline-link" to={`/targets/${data.evidence.targetId}`}>
+                        {data.evidence.targetName ?? data.evidence.targetId}
                       </Link>
                     </dd>
                   </div>
                   <div className="detail-list-row">
                     <dt>{t("evidence.table.subject")}</dt>
                     <dd>
-                      {translateEvidenceSubjectType(data.subjectType)} · {data.subjectLabel ?? data.subjectId}
+                      {translateEvidenceSubjectType(data.evidence.subjectType)} · {data.evidence.subjectLabel ?? data.evidence.subjectId}
                     </dd>
                   </div>
                 </dl>
 
                 <div className="detail-chips">
-                  {formatDetailEntries(data.details).map((entry) => (
+                  {formatDetailEntries(data.evidence.details).map((entry) => (
                     <span key={entry} className="detail-chip">
                       {entry}
                     </span>
@@ -93,7 +99,7 @@ export function EvidenceDetailPage() {
                 <p>
                   <Link
                     className="inline-link"
-                    to={resourcePathForSubject(data.targetId, data.subjectType, data.subjectId)}
+                    to={resourcePathForSubject(data.evidence.targetId, data.evidence.subjectType, data.evidence.subjectId)}
                   >
                     {t("common.openResource")}
                   </Link>
@@ -102,11 +108,11 @@ export function EvidenceDetailPage() {
                 <div className="detail-list">
                   <div className="detail-list-row">
                     <dt>{t("evidenceDetail.pathRefsTitle")}</dt>
-                    <dd>{data.pathRefs?.length ? data.pathRefs.join(" | ") : "-"}</dd>
+                    <dd>{data.evidence.pathRefs?.length ? data.evidence.pathRefs.join(" | ") : "-"}</dd>
                   </div>
                   <div className="detail-list-row">
                     <dt>{t("evidenceDetail.fieldRefsTitle")}</dt>
-                    <dd>{data.fieldRefs?.length ? data.fieldRefs.join(" | ") : "-"}</dd>
+                    <dd>{data.evidence.fieldRefs?.length ? data.evidence.fieldRefs.join(" | ") : "-"}</dd>
                   </div>
                 </div>
               </div>

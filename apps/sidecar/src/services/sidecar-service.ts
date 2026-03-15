@@ -2,13 +2,19 @@ import type {
   Agent,
   AuthProfile,
   BindingRoute,
+  CoverageSummary,
   InventorySummary,
+  LogEntriesQuery,
+  Node,
+  Plugin,
+  PresenceEntry,
   RuntimeStatus,
   Session,
   SystemSnapshot,
   Target,
   TargetSnapshotSummary,
   TopologyView,
+  Tool,
   Workspace,
   WorkspaceDocument,
 } from "@openclaw-team-ops/shared";
@@ -59,6 +65,22 @@ export class SidecarService {
     return (await this.getSnapshot()).sessions;
   }
 
+  async getPresence(): Promise<PresenceEntry[]> {
+    return (await this.adapter.getPresence()).items;
+  }
+
+  async getNodes(): Promise<Node[]> {
+    return (await this.adapter.getNodes()).items;
+  }
+
+  async getTools(): Promise<Tool[]> {
+    return (await this.adapter.getTools()).items;
+  }
+
+  async getPlugins(): Promise<Plugin[]> {
+    return (await this.adapter.getPlugins()).items;
+  }
+
   async getBindings(): Promise<BindingRoute[]> {
     return (await this.getSnapshot()).bindings;
   }
@@ -73,6 +95,26 @@ export class SidecarService {
 
   async getSummary(): Promise<InventorySummary> {
     return (await this.getSnapshot()).summary;
+  }
+
+  async getCoverage(): Promise<CoverageSummary> {
+    return (await this.getSnapshot()).sourceRegistry;
+  }
+
+  getLogFiles() {
+    return this.adapter.getLogFiles();
+  }
+
+  getLogSummary(date?: string) {
+    return this.adapter.getLogSummary(date);
+  }
+
+  getLogEntries(query: LogEntriesQuery) {
+    return this.adapter.getLogEntries(query);
+  }
+
+  getLogRawFile(date?: string) {
+    return this.adapter.getLogRawFile(date);
   }
 
   async getTopology(): Promise<TopologyView> {

@@ -18,20 +18,48 @@ import {
   type CollectionMetadata,
   type CollectionName,
   type EntityStatus,
+  type LogEntriesQuery,
+  type Node,
+  type Plugin,
+  type PresenceEntry,
   type RuntimeStatus,
   type Session,
   type SnapshotWarning,
+  type SourceCollectionStatus,
   type SystemSnapshot,
+  type Tool,
   type Workspace,
   type WorkspaceDocument,
 } from "@openclaw-team-ops/shared";
 
-import type { AdapterHealth, SidecarInventoryAdapter } from "../source-adapter.js";
+import type {
+  AdapterHealth,
+  AdapterLogEntriesResult,
+  AdapterLogFilesResult,
+  AdapterLogRawFileResult,
+  AdapterLogSummaryResult,
+  AdapterNodesResult,
+  AdapterPluginsResult,
+  AdapterPresenceResult,
+  AdapterToolsResult,
+  SidecarInventoryAdapter,
+} from "../source-adapter.js";
+import { buildSourceRegistry } from "../../domain/source-registry.js";
+import { GatewayWsRuntimeClient, type GatewayRuntimeClient } from "../gateway-ws/gateway-client.js";
+import type { GatewayClock, GatewayRuntimeSnapshot } from "../gateway-ws/protocol.js";
+import { buildLogSummary } from "./logs/build-log-summary.js";
+import { discoverLogFiles } from "./logs/discover-log-files.js";
+import { parseLogLine } from "./logs/parse-log-line.js";
+import { readLogFile } from "./logs/read-log-file.js";
+import { tailLogFile } from "./logs/tail-log-file.js";
 
 const CONFIG_SOURCE_ID = "filesystem:config-file";
 const RUNTIME_SOURCE_ID = "filesystem:runtime-root";
 const WORKSPACE_SOURCE_ID = "filesystem:workspace-scan";
 const SOURCE_ROOT_SOURCE_ID = "filesystem:source-root";
+const LOG_SOURCE_ID = "filesystem:logs";
+const GATEWAY_WS_SOURCE_ID = "gateway-ws:operator-read";
+const GATEWAY_WS_CACHE_TTL_MS = 5_000;
 const SESSION_ACTIVITY_WINDOW_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_OPENCLAW_STATE_DIRNAME = ".openclaw";
 const LEGACY_CONFIG_FILENAMES = ["clawdbot.json", "moldbot.json", "moltbot.json"] as const;
@@ -61,33 +89,99 @@ export interface FilesystemOpenClawAdapterOptions {
   configFile?: string | undefined;
   configPath?: string | undefined;
   workspaceGlob?: string | undefined;
+  logGlob?: string | undefined;
+  gatewayUrl?: string | undefined;
+  gatewayToken?: string | undefined;
   sourceRoot?: string | undefined;
   profile?: string | undefined;
   clock?: FilesystemOpenClawAdapterClock | undefined;
   homedir?: (() => string) | undefined;
+  gatewayTimeoutMs?: number | undefined;
+  gatewayClientFactory?: ((
+    options: { url: string; timeoutMs: number; clock: GatewayClock; authToken?: string },
+  ) => GatewayRuntimeClient) | undefined;
 }
 
 interface ResolvedFilesystemPaths {
   runtimeRoot: string | undefined;
   configFile: string | undefined;
   workspaceGlob: string | undefined;
+  logGlob: string | undefined;
+  gatewayUrl: string | undefined;
+  gatewayToken: string | undefined;
   sourceRoot: string | undefined;
   profile: string | undefined;
   configBaseDir: string;
 }
 
+interface GatewayRuntimeCacheEntry {
+  loadedAtMs: number;
+  result: GatewayRuntimeLoadResult;
+}
+
+interface GatewayRuntimeLoadResult {
+  configured: boolean;
+  connected: boolean;
+  fetchedAt: string;
+  warnings: SnapshotWarning[];
+  collections: {
+    presence: GatewayRuntimeSnapshot["presence"];
+    nodes: GatewayRuntimeSnapshot["nodes"];
+    sessions: GatewayRuntimeSnapshot["sessions"];
+    tools: GatewayRuntimeSnapshot["tools"];
+    plugins: GatewayRuntimeSnapshot["plugins"];
+  };
+}
+
+interface GatewayAuthResolution {
+  token: string | undefined;
+  warnings: SnapshotWarning[];
+}
+
 interface RawOpenClawConfig {
+  logging?: {
+    file?: string;
+  };
+  gateway?: {
+    auth?: {
+      mode?: string;
+      token?: unknown;
+      password?: unknown;
+    };
+    remote?: {
+      url?: string;
+      token?: unknown;
+      password?: unknown;
+    };
+  };
   agents?: {
     defaults?: {
       workspace?: string;
     };
     list?: RawAgentConfig[];
   };
+  secrets?: {
+    defaults?: {
+      env?: string;
+      file?: string;
+      exec?: string;
+    };
+    providers?: Record<string, RawSecretProviderConfig>;
+  };
   session?: {
     store?: string;
   };
   bindings?: RawBindingConfig[];
 }
+
+interface RawSecretProviderConfig {
+  source?: string;
+  path?: string;
+  mode?: string;
+}
+
+type RawSecretsDefaults = NonNullable<NonNullable<RawOpenClawConfig["secrets"]>["defaults"]>;
+type RawSecretsProviders = NonNullable<NonNullable<RawOpenClawConfig["secrets"]>["providers"]>;
 
 interface RawAgentConfig {
   id?: string;
@@ -139,6 +233,15 @@ interface ParseResult<T> {
   data: T;
   stat: Awaited<ReturnType<typeof statIfExists>>;
 }
+
+interface SecretRefLike {
+  source: "env" | "file" | "exec";
+  provider: string;
+  id: string;
+}
+
+const DEFAULT_SECRET_PROVIDER_ALIAS = "default";
+const ENV_SECRET_TEMPLATE_RE = /^\$\{([A-Z][A-Z0-9_]{0,127})\}$/;
 
 function isWorkspaceBootstrapFileName(fileName: string): fileName is (typeof WORKSPACE_BOOTSTRAP_FILES)[number] {
   return WORKSPACE_BOOTSTRAP_FILES.includes(fileName as (typeof WORKSPACE_BOOTSTRAP_FILES)[number]);
@@ -418,6 +521,453 @@ async function loadConfigFile(
     data: resolved.value as RawOpenClawConfig,
     files: Array.from(new Set([resolvedPath, ...resolved.files])),
   };
+}
+
+function normalizeSecretInput(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseSecretRefLike(value: unknown, defaults?: RawSecretsDefaults): SecretRefLike | null {
+  if (isRecord(value)) {
+    const source = value.source;
+    const provider = typeof value.provider === "string" && value.provider.trim().length > 0 ? value.provider.trim() : undefined;
+    const id = typeof value.id === "string" && value.id.trim().length > 0 ? value.id.trim() : undefined;
+
+    if ((source === "env" || source === "file" || source === "exec") && id) {
+      return {
+        source,
+        provider:
+          provider ??
+          (source === "env"
+            ? defaults?.env?.trim() || DEFAULT_SECRET_PROVIDER_ALIAS
+            : source === "file"
+              ? defaults?.file?.trim() || DEFAULT_SECRET_PROVIDER_ALIAS
+              : defaults?.exec?.trim() || DEFAULT_SECRET_PROVIDER_ALIAS),
+        id,
+      };
+    }
+  }
+
+  const template = typeof value === "string" ? ENV_SECRET_TEMPLATE_RE.exec(value.trim()) : null;
+
+  if (!template) {
+    return null;
+  }
+
+  return {
+    source: "env",
+    provider: defaults?.env?.trim() || DEFAULT_SECRET_PROVIDER_ALIAS,
+    id: template[1] ?? "",
+  };
+}
+
+async function loadDotEnvMap(dotEnvPath: string | undefined): Promise<Record<string, string>> {
+  if (!dotEnvPath) {
+    return {};
+  }
+
+  const dotEnvStat = await statIfExists(dotEnvPath);
+
+  if (!dotEnvStat.exists || !dotEnvStat.isFile) {
+    return {};
+  }
+
+  const raw = await readFile(dotEnvPath, "utf8");
+  return parseDotEnvContents(raw);
+}
+
+function parseDotEnvContents(raw: string): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  for (const line of raw.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+
+    if (trimmed.length === 0 || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const withoutExport = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+    const separatorIndex = withoutExport.indexOf("=");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = withoutExport.slice(0, separatorIndex).trim();
+
+    if (key.length === 0) {
+      continue;
+    }
+
+    let value = withoutExport.slice(separatorIndex + 1).trim();
+
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    } else {
+      const commentIndex = value.indexOf(" #");
+
+      if (commentIndex >= 0) {
+        value = value.slice(0, commentIndex).trimEnd();
+      }
+    }
+
+    values[key] = value;
+  }
+
+  return values;
+}
+
+async function buildGatewayResolutionEnv(runtimeRoot: string | undefined): Promise<Record<string, string>> {
+  const runtimeEnv = await loadDotEnvMap(runtimeRoot ? path.join(runtimeRoot, ".env") : undefined);
+  const cwdEnv = await loadDotEnvMap(path.join(process.cwd(), ".env"));
+  const merged: Record<string, string> = {
+    ...runtimeEnv,
+    ...cwdEnv,
+  };
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === "string") {
+      merged[key] = value;
+    }
+  }
+
+  return merged;
+}
+
+function readJsonPointerValue(input: unknown, pointer: string): unknown {
+  if (pointer === "") {
+    return input;
+  }
+
+  if (!pointer.startsWith("/")) {
+    return undefined;
+  }
+
+  let current: unknown = input;
+
+  for (const rawSegment of pointer.slice(1).split("/")) {
+    const segment = rawSegment.replaceAll("~1", "/").replaceAll("~0", "~");
+
+    if (Array.isArray(current)) {
+      const index = Number.parseInt(segment, 10);
+
+      if (Number.isNaN(index)) {
+        return undefined;
+      }
+
+      current = current[index];
+      continue;
+    }
+
+    if (!isRecord(current)) {
+      return undefined;
+    }
+
+    current = current[segment];
+  }
+
+  return current;
+}
+
+function formatSecretRefLabel(ref: SecretRefLike): string {
+  return `${ref.source}:${ref.provider}:${ref.id}`;
+}
+
+function normalizeGatewayAuthMode(value: unknown): string | undefined {
+  const normalized = normalizeSecretInput(value)?.toLowerCase();
+
+  return normalized ? normalized : undefined;
+}
+
+async function resolveConfiguredGatewayToken(params: {
+  config: RawOpenClawConfig;
+  configBaseDir: string;
+  runtimeRoot: string | undefined;
+  homedir: () => string;
+}): Promise<GatewayAuthResolution> {
+  const warnings: SnapshotWarning[] = [];
+  const env = await buildGatewayResolutionEnv(params.runtimeRoot);
+  const authMode = normalizeGatewayAuthMode(params.config.gateway?.auth?.mode);
+
+  if (authMode === "password") {
+    warnings.push(
+      warning(
+        "OPENCLAW_GATEWAY_AUTH_PASSWORD_UNSUPPORTED",
+        "warn",
+        "Gateway auth mode is set to password. Team Ops Console can only auto-connect with token auth in read-only mode today.",
+        "runtimeStatuses",
+        GATEWAY_WS_SOURCE_ID,
+      ),
+    );
+
+    return {
+      token: undefined,
+      warnings,
+    };
+  }
+
+  const candidateValues = [
+    {
+      path: "gateway.auth.token",
+      value: params.config.gateway?.auth?.token,
+      fallbackLabel: undefined,
+    },
+    {
+      path: "gateway.remote.token",
+      value: params.config.gateway?.remote?.token,
+      fallbackLabel: "remote gateway token fallback",
+    },
+  ];
+
+  for (const candidate of candidateValues) {
+    const resolved = await resolveSecretBackedGatewayValue({
+      value: candidate.value,
+      pathLabel: candidate.path,
+      ...(candidate.fallbackLabel ? { fallbackLabel: candidate.fallbackLabel } : {}),
+      ...(params.config.secrets?.defaults ? { defaults: params.config.secrets.defaults } : {}),
+      ...(params.config.secrets?.providers ? { providers: params.config.secrets.providers } : {}),
+      env,
+      configBaseDir: params.configBaseDir,
+      homedir: params.homedir,
+    });
+
+    warnings.push(...resolved.warnings);
+
+    if (resolved.value) {
+      return {
+        token: resolved.value,
+        warnings,
+      };
+    }
+  }
+
+  if (authMode === "token") {
+    warnings.push(
+      warning(
+        "OPENCLAW_GATEWAY_AUTH_TOKEN_UNRESOLVED",
+        "warn",
+        "Gateway auth mode is token, but Team Ops Console could not resolve gateway.auth.token from openclaw.json or supported secret refs.",
+        "runtimeStatuses",
+        GATEWAY_WS_SOURCE_ID,
+      ),
+    );
+  }
+
+  return {
+    token: undefined,
+    warnings,
+  };
+}
+
+async function resolveSecretBackedGatewayValue(params: {
+  value: unknown;
+  pathLabel: string;
+  fallbackLabel?: string | undefined;
+  defaults?: RawSecretsDefaults;
+  providers?: RawSecretsProviders;
+  env: Record<string, string>;
+  configBaseDir: string;
+  homedir: () => string;
+}): Promise<{ value?: string; warnings: SnapshotWarning[] }> {
+  const directValue = normalizeSecretInput(params.value);
+
+  if (directValue) {
+    const inlineRef = parseSecretRefLike(directValue, params.defaults);
+
+    if (!inlineRef) {
+      return {
+        value: directValue,
+        warnings: [],
+      };
+    }
+
+    return resolveGatewaySecretRef({
+      ref: inlineRef,
+      pathLabel: params.pathLabel,
+      ...(params.fallbackLabel ? { fallbackLabel: params.fallbackLabel } : {}),
+      ...(params.providers ? { providers: params.providers } : {}),
+      ...(params.defaults ? { defaults: params.defaults } : {}),
+      env: params.env,
+      configBaseDir: params.configBaseDir,
+      homedir: params.homedir,
+    });
+  }
+
+  const ref = parseSecretRefLike(params.value, params.defaults);
+
+  if (!ref) {
+    return {
+      warnings: [],
+    };
+  }
+
+  return resolveGatewaySecretRef({
+    ref,
+    pathLabel: params.pathLabel,
+    ...(params.fallbackLabel ? { fallbackLabel: params.fallbackLabel } : {}),
+    ...(params.providers ? { providers: params.providers } : {}),
+    ...(params.defaults ? { defaults: params.defaults } : {}),
+    env: params.env,
+    configBaseDir: params.configBaseDir,
+    homedir: params.homedir,
+  });
+}
+
+async function resolveGatewaySecretRef(params: {
+  ref: SecretRefLike;
+  pathLabel: string;
+  fallbackLabel?: string | undefined;
+  providers?: RawSecretsProviders;
+  defaults?: RawSecretsDefaults;
+  env: Record<string, string>;
+  configBaseDir: string;
+  homedir: () => string;
+}): Promise<{ value?: string; warnings: SnapshotWarning[] }> {
+  if (params.ref.source === "env") {
+    const envValue = params.env[params.ref.id]?.trim();
+
+    if (envValue) {
+      return {
+        value: envValue,
+        warnings: [],
+      };
+    }
+
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_REF_UNRESOLVED",
+          "warn",
+          `${params.pathLabel} points to ${formatSecretRefLabel(params.ref)}, but the environment variable is not available to the sidecar.`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  }
+
+  if (params.ref.source === "exec") {
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_REF_EXEC_UNSUPPORTED",
+          "warn",
+          `${params.pathLabel} uses ${formatSecretRefLabel(params.ref)}. Team Ops Console will not execute secret providers while auto-discovering gateway auth in read-only mode.`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  }
+
+  const providerName = params.ref.provider.trim() || params.defaults?.file?.trim() || DEFAULT_SECRET_PROVIDER_ALIAS;
+  const provider = params.providers?.[providerName];
+
+  if (!provider || provider.source !== "file" || typeof provider.path !== "string" || provider.path.trim().length === 0) {
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_PROVIDER_INVALID",
+          "warn",
+          `${params.pathLabel} references ${formatSecretRefLabel(params.ref)}, but the file secret provider "${providerName}" is missing or not configured as a readable file source.`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  }
+
+  const providerPathValue = normalizeSecretInput(provider.path);
+  const providerPathRef = parseSecretRefLike(provider.path, params.defaults);
+  let providerPath = providerPathValue;
+
+  if (providerPathRef?.source === "env") {
+    providerPath = params.env[providerPathRef.id]?.trim();
+  }
+
+  if (!providerPath) {
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_PROVIDER_PATH_UNRESOLVED",
+          "warn",
+          `${params.pathLabel} references ${formatSecretRefLabel(params.ref)}, but the provider path for "${providerName}" could not be resolved.`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  }
+
+  const secretFilePath = resolvePathInput(providerPath, params.configBaseDir, params.homedir);
+
+  try {
+    const raw = await readFile(secretFilePath, "utf8");
+    const mode = normalizeSecretInput(provider.mode)?.toLowerCase();
+
+    if (params.ref.id === "value" && mode !== "json") {
+      const singleValue = raw.trim();
+      return singleValue.length > 0
+        ? {
+            value: singleValue,
+            warnings: [],
+          }
+        : {
+            warnings: [
+              warning(
+                "OPENCLAW_GATEWAY_SECRET_FILE_EMPTY",
+                "warn",
+                `${params.pathLabel} resolved through ${formatSecretRefLabel(params.ref)}, but ${secretFilePath} was empty.`,
+                "runtimeStatuses",
+                GATEWAY_WS_SOURCE_ID,
+              ),
+            ],
+          };
+    }
+
+    const parsed = JSON5.parse(raw) as unknown;
+    const resolvedValue = readJsonPointerValue(parsed, params.ref.id);
+    const normalized = normalizeSecretInput(resolvedValue);
+
+    if (normalized) {
+      return {
+        value: normalized,
+        warnings: [],
+      };
+    }
+
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_FILE_POINTER_UNRESOLVED",
+          "warn",
+          `${params.pathLabel} resolved through ${formatSecretRefLabel(params.ref)}, but ${params.ref.id} did not point to a non-empty string in ${secretFilePath}.`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  } catch (error) {
+    return {
+      warnings: [
+        warning(
+          "OPENCLAW_GATEWAY_SECRET_FILE_READ_FAILED",
+          "warn",
+          `${params.pathLabel} references ${formatSecretRefLabel(params.ref)}, but the sidecar could not read ${secretFilePath}: ${error instanceof Error ? error.message : "unknown error"}`,
+          "runtimeStatuses",
+          GATEWAY_WS_SOURCE_ID,
+        ),
+      ],
+    };
+  }
 }
 
 async function statIfExists(targetPath: string | undefined) {
@@ -733,6 +1283,21 @@ function collectionFreshness(hasSource: boolean): CollectionMetadata["freshness"
   return hasSource ? "fresh" : "unknown";
 }
 
+function createGatewayCollectionStatus(
+  key: SourceCollectionStatus["key"],
+  collection: GatewayRuntimeLoadResult["collections"][keyof GatewayRuntimeLoadResult["collections"]],
+  fetchedAt: string,
+): SourceCollectionStatus {
+  return {
+    key,
+    sourceKind: "gateway-ws",
+    freshness: collection.freshness,
+    coverage: collection.coverage,
+    warningCount: collection.warningMessages.length,
+    ...(collection.coverage !== "unavailable" ? { lastSuccessAt: fetchedAt } : {}),
+  };
+}
+
 async function scanWorkspaceDirectories(pattern: string): Promise<string[]> {
   const matches: string[] = [];
 
@@ -843,10 +1408,22 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
   private readonly configFileInput: string | undefined;
   private readonly configPathInput: string | undefined;
   private readonly workspaceGlobInput: string | undefined;
+  private readonly logGlobInput: string | undefined;
+  private readonly gatewayUrlInput: string | undefined;
+  private readonly gatewayTokenInput: string | undefined;
   private readonly sourceRootInput: string | undefined;
   private readonly profileInput: string | undefined;
   private readonly clock: FilesystemOpenClawAdapterClock;
   private readonly homedir: () => string;
+  private readonly gatewayTimeoutMs: number;
+  private readonly gatewayClientFactory: (options: {
+    url: string;
+    timeoutMs: number;
+    clock: GatewayClock;
+    authToken?: string;
+  }) => GatewayRuntimeClient;
+  private gatewayRuntimeCache: GatewayRuntimeCacheEntry | undefined;
+  private gatewayRuntimeLoadPromise: Promise<GatewayRuntimeLoadResult> | undefined;
 
   constructor(options: FilesystemOpenClawAdapterOptions = {}) {
     this.runtimeRootInput = normalizeInput(options.runtimeRoot);
@@ -854,10 +1431,23 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     this.configFileInput = normalizeInput(options.configFile);
     this.configPathInput = normalizeInput(options.configPath);
     this.workspaceGlobInput = normalizeInput(options.workspaceGlob);
+    this.logGlobInput = normalizeInput(options.logGlob);
+    this.gatewayUrlInput = normalizeInput(options.gatewayUrl);
+    this.gatewayTokenInput = normalizeInput(options.gatewayToken);
     this.sourceRootInput = normalizeInput(options.sourceRoot);
     this.profileInput = normalizeProfile(options.profile);
     this.clock = options.clock ?? { now: () => new Date() };
     this.homedir = options.homedir ?? os.homedir;
+    this.gatewayTimeoutMs = options.gatewayTimeoutMs ?? 5000;
+    this.gatewayClientFactory =
+      options.gatewayClientFactory ??
+      ((gatewayOptions) =>
+        new GatewayWsRuntimeClient({
+          url: gatewayOptions.url,
+          timeoutMs: gatewayOptions.timeoutMs,
+          clock: gatewayOptions.clock,
+          ...(gatewayOptions.authToken ? { authToken: gatewayOptions.authToken } : {}),
+        }));
   }
 
   async describeSources(): Promise<AdapterSourceDescriptor[]> {
@@ -897,6 +1487,31 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         confidence: "confirmed",
         location: resolved.workspaceGlob,
         notes: "Workspace directories discovered with a read-only glob scan.",
+      });
+    }
+
+    if (resolved.logGlob) {
+      sources.push({
+        id: LOG_SOURCE_ID,
+        displayName: "OpenClaw log glob",
+        kind: "filesystem",
+        readOnly: true,
+        confidence: "confirmed",
+        location: resolved.logGlob,
+        notes: "Read-only log discovery using an explicit glob override.",
+      });
+    }
+
+    if (resolved.gatewayUrl) {
+      sources.push({
+        id: GATEWAY_WS_SOURCE_ID,
+        displayName: "OpenClaw Gateway WebSocket",
+        kind: "websocket",
+        readOnly: true,
+        confidence: "confirmed",
+        location: resolved.gatewayUrl,
+        notes:
+          "Read-only Gateway WebSocket runtime collection using role=operator and scopes=[operator.read] only. Gateway auth token is auto-discovered from openclaw.json when available.",
       });
     }
 
@@ -996,6 +1611,16 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     const rawBindings = Array.isArray(parsedConfig?.data.bindings)
       ? parsedConfig.data.bindings.filter(isRecord).map((entry) => entry as RawBindingConfig)
       : [];
+    const logDiscovery = await discoverLogFiles({
+      configFile: resolved.configFile,
+      configBaseDir,
+      logGlob: resolved.logGlob,
+      now: this.clock.now(),
+    });
+
+    for (const logWarning of logDiscovery.warnings) {
+      warnings.push(logWarning);
+    }
 
     const runtimeAgentIds = runtimeRootStat.exists
       ? await listDirectoryNames(resolved.runtimeRoot ? path.join(resolved.runtimeRoot, "agents") : undefined)
@@ -1210,7 +1835,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     }
 
     const authProfiles: AuthProfile[] = [];
-    const sessions: Session[] = [];
+    const filesystemSessions: Session[] = [];
 
     for (const agentDefinition of agentDefinitions.values()) {
       const agentDirStat = await statIfExists(agentDefinition.agentDirPath);
@@ -1373,7 +1998,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
                       : undefined,
                 );
 
-                sessions.push({
+                filesystemSessions.push({
                   id: `session:${agentDefinition.id}:${sessionId}`,
                   ...(workspaceId ? { workspaceId } : {}),
                   agentId: agentDefinition.id,
@@ -1415,12 +2040,49 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       }
     }
 
+    const gatewayRuntime = await this.loadGatewayRuntime(resolved, parsedConfig);
+
+    for (const gatewayWarning of gatewayRuntime.warnings) {
+      addWarning(gatewayWarning);
+    }
+
+    const useGatewayRuntimeSessions =
+      gatewayRuntime.connected && gatewayRuntime.collections.sessions.coverage !== "unavailable";
+    const sessions: Session[] = useGatewayRuntimeSessions
+      ? gatewayRuntime.collections.sessions.items.map((session) => {
+          if (session.workspaceId || !session.agentId) {
+            return session;
+          }
+
+          const workspacePath = agentDefinitions.get(session.agentId)?.workspacePath;
+          const workspaceId = workspacePath ? workspaceByPath.get(workspacePath)?.id : undefined;
+          return workspaceId ? { ...session, workspaceId } : session;
+        })
+      : filesystemSessions;
+    const sessionStatsByAgent = new Map<string, { count: number; lastActivityAt?: string }>();
+
+    for (const session of sessions) {
+      if (!session.agentId) {
+        continue;
+      }
+
+      const existing = sessionStatsByAgent.get(session.agentId);
+
+      sessionStatsByAgent.set(session.agentId, {
+        count: (existing?.count ?? 0) + 1,
+        ...(latestIsoDate(existing?.lastActivityAt, session.lastActivityAt)
+          ? { lastActivityAt: latestIsoDate(existing?.lastActivityAt, session.lastActivityAt) as string }
+          : {}),
+      });
+    }
+
     const agents: Agent[] = Array.from(agentDefinitions.values()).map((agentDefinition) => {
       const workspace = agentDefinition.workspacePath ? workspaceByPath.get(agentDefinition.workspacePath) : undefined;
+      const sessionStats = sessionStatsByAgent.get(agentDefinition.id);
       const name = agentDefinition.rawConfig?.name ?? agentDefinition.id;
       const agentUpdatedAt = latestIsoDate(
         workspace?.updatedAt,
-        agentDefinition.lastSessionActivityAt,
+        sessionStats?.lastActivityAt ?? agentDefinition.lastSessionActivityAt,
         agentDefinition.authProfileUpdatedAt,
       );
       const tags = [
@@ -1436,7 +2098,7 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
           workspaceStatus: workspace?.status,
           agentDirExists: agentDefinition.agentDirExists,
           authProfileCount: agentDefinition.authProfileIds.length,
-          sessionCount: agentDefinition.sessionCount,
+          sessionCount: sessionStats?.count ?? agentDefinition.sessionCount,
         }),
         ...(workspace ? { workspaceId: workspace.id } : {}),
         ...(agentDefinition.primaryAuthProfileId ? { authProfileId: agentDefinition.primaryAuthProfileId } : {}),
@@ -1515,16 +2177,20 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       }),
       sessions: createCollectionMetadata({
         collection: "sessions",
-        status: buildCollectionStatus({
-          hasSource: Boolean(resolved.runtimeRoot),
-          itemCount: sessions.length,
-          warnings: collectionWarnings.sessions,
-          allowEmptyComplete: runtimeRootStat.exists && runtimeAgentIds.length === 0 && agents.length === 0,
-        }),
-        freshness: collectionFreshness(Boolean(resolved.runtimeRoot)),
+        status: useGatewayRuntimeSessions
+          ? gatewayRuntime.collections.sessions.coverage
+          : buildCollectionStatus({
+              hasSource: Boolean(resolved.runtimeRoot),
+              itemCount: sessions.length,
+              warnings: collectionWarnings.sessions,
+              allowEmptyComplete: runtimeRootStat.exists && runtimeAgentIds.length === 0 && agents.length === 0,
+            }),
+        freshness: useGatewayRuntimeSessions
+          ? gatewayRuntime.collections.sessions.freshness
+          : collectionFreshness(Boolean(resolved.runtimeRoot)),
         collectedAt: generatedAt,
         recordCount: sessions.length,
-        sourceIds: resolved.runtimeRoot ? [RUNTIME_SOURCE_ID] : [],
+        sourceIds: useGatewayRuntimeSessions ? [GATEWAY_WS_SOURCE_ID] : resolved.runtimeRoot ? [RUNTIME_SOURCE_ID] : [],
         warnings: collectionWarnings.sessions,
       }),
       bindings: createCollectionMetadata({
@@ -1574,6 +2240,22 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         warnings: collectionWarnings.topology,
       }),
     };
+    const gatewayCollections = gatewayRuntime.collections;
+    const gatewayCollectionList = [
+      gatewayCollections.presence,
+      gatewayCollections.nodes,
+      gatewayCollections.sessions,
+      gatewayCollections.tools,
+      gatewayCollections.plugins,
+    ];
+    const gatewayDependencyStatus =
+      !resolved.gatewayUrl
+        ? "unknown"
+        : !gatewayRuntime.connected
+          ? "offline"
+          : gatewayCollectionList.some((collection) => collection.coverage !== "complete")
+            ? "degraded"
+            : "healthy";
 
     const runtimeStatuses: RuntimeStatus[] = [
       {
@@ -1645,10 +2327,21 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       {
         componentId: "openclaw-session-scan",
         componentType: "dependency",
-        status: sessions.length > 0 ? "healthy" : resolved.runtimeRoot ? "degraded" : "unknown",
+        status: useGatewayRuntimeSessions
+          ? gatewayRuntime.collections.sessions.coverage === "complete"
+            ? "healthy"
+            : gatewayRuntime.collections.sessions.coverage === "partial"
+              ? "degraded"
+              : "offline"
+          : sessions.length > 0
+            ? "healthy"
+            : resolved.runtimeRoot
+              ? "degraded"
+              : "unknown",
         observedAt: generatedAt,
         details: {
           runtimeRootConfigured: Boolean(resolved.runtimeRoot),
+          runtimeSource: useGatewayRuntimeSessions ? "gateway-ws" : "filesystem",
           discoveredSessions: sessions.length,
           activeSessions: sessions.filter((session) => session.status === "active").length,
         },
@@ -1662,6 +2355,41 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
           runtimeRootConfigured: Boolean(resolved.runtimeRoot),
           discoveredAuthProfiles: authProfiles.length,
           healthyAuthProfiles: authProfiles.filter((profile) => profile.status === "valid").length,
+        },
+      },
+      {
+        componentId: "openclaw-log-scan",
+        componentType: "dependency",
+        status:
+          logDiscovery.collectionStatus.coverage === "complete"
+            ? "healthy"
+            : logDiscovery.collectionStatus.coverage === "partial"
+              ? "degraded"
+              : "offline",
+        observedAt: generatedAt,
+        details: {
+          configuredGlob: resolved.logGlob ?? null,
+          discoveredLogFiles: logDiscovery.items.length,
+          latestLogPath: logDiscovery.items[0]?.path ?? null,
+          latestLogModifiedAt: logDiscovery.items[0]?.modifiedAt ?? null,
+        },
+      },
+      {
+        componentId: "openclaw-gateway-ws",
+        componentType: "dependency",
+        status: gatewayDependencyStatus,
+        observedAt: generatedAt,
+        details: {
+          url: resolved.gatewayUrl ?? null,
+          configured: Boolean(resolved.gatewayUrl),
+          connected: gatewayRuntime.connected,
+          role: "operator",
+          scopes: "operator.read",
+          presenceCount: gatewayCollections.presence.items.length,
+          nodeCount: gatewayCollections.nodes.items.length,
+          runtimeSessionCount: gatewayCollections.sessions.items.length,
+          toolCount: gatewayCollections.tools.items.length,
+          pluginCount: gatewayCollections.plugins.items.length,
         },
       },
       ...(resolved.sourceRoot
@@ -1745,6 +2473,31 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         sources: sourceDescriptors,
       },
       collections,
+      sourceRegistry: buildSourceRegistry({
+        source: "openclaw",
+        generatedAt,
+        origin: {
+          adapterName: this.adapterName,
+          mode: this.mode,
+          collectedAt: generatedAt,
+          sources: sourceDescriptors,
+        },
+        collections,
+        warnings,
+      }, [
+        logDiscovery.collectionStatus,
+        ...(gatewayRuntime.configured
+          ? [
+              createGatewayCollectionStatus("presence", gatewayCollections.presence, gatewayRuntime.fetchedAt),
+              ...(useGatewayRuntimeSessions
+                ? [createGatewayCollectionStatus("sessions", gatewayCollections.sessions, gatewayRuntime.fetchedAt)]
+                : []),
+              createGatewayCollectionStatus("nodes", gatewayCollections.nodes, gatewayRuntime.fetchedAt),
+              createGatewayCollectionStatus("tools", gatewayCollections.tools, gatewayRuntime.fetchedAt),
+              createGatewayCollectionStatus("plugins", gatewayCollections.plugins, gatewayRuntime.fetchedAt),
+            ]
+          : []),
+      ]),
       warnings,
       agents,
       workspaces,
@@ -1798,6 +2551,249 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     return document;
   }
 
+  async getLogFiles(): Promise<AdapterLogFilesResult> {
+    const resolved = this.resolvePaths();
+
+    return discoverLogFiles({
+      configFile: resolved.configFile,
+      configBaseDir: resolved.configBaseDir,
+      logGlob: resolved.logGlob,
+      now: this.clock.now(),
+    });
+  }
+
+  async getLogSummary(date?: string): Promise<AdapterLogSummaryResult> {
+    const filesResult = await this.getLogFiles();
+    const fallbackDate = date ?? filesResult.items[0]?.date ?? this.clock.now().toISOString().slice(0, 10);
+    const file = selectLogFile(filesResult.items, date);
+
+    if (!file) {
+      return {
+        collectionStatus: filesResult.collectionStatus,
+        ...withOptionalWarnings(filesResult.warnings),
+        item: buildLogSummary(fallbackDate, []),
+      };
+    }
+
+    try {
+      const { lines } = await readLogFile(file);
+      const entries = lines.map((line, index) => parseLogLine(line, index + 1));
+      const summary = buildLogSummary(file.date, entries, file);
+
+      return {
+        collectionStatus: deriveParsedLogStatus(filesResult.collectionStatus, entries),
+        ...withOptionalWarnings(filesResult.warnings),
+        item: summary,
+      };
+    } catch (error) {
+      const warning = buildLogReadWarning(file.path, error);
+
+      return {
+        collectionStatus: {
+          ...filesResult.collectionStatus,
+          coverage: "partial",
+          warningCount: filesResult.collectionStatus.warningCount + 1,
+        },
+        warnings: [...(filesResult.warnings ?? []), warning],
+        item: buildLogSummary(file.date, [], file),
+      };
+    }
+  }
+
+  async getLogEntries(query: LogEntriesQuery): Promise<AdapterLogEntriesResult> {
+    const filesResult = await this.getLogFiles();
+    const limit = normalizeLogLimit(query.limit);
+    const fallbackDate = query.date ?? filesResult.items[0]?.date ?? this.clock.now().toISOString().slice(0, 10);
+    const file = selectLogFile(filesResult.items, query.date);
+    const cursor = typeof query.cursor === "string" && query.cursor.trim().length > 0 ? query.cursor : undefined;
+
+    if (!file) {
+      return {
+        collectionStatus: filesResult.collectionStatus,
+        ...withOptionalWarnings(filesResult.warnings),
+        item: {
+          date: fallbackDate,
+          items: [],
+          total: 0,
+          limit,
+          ...(cursor ? { cursor } : {}),
+          availableLevels: [],
+          availableSubsystems: [],
+          availableTags: [],
+        },
+      };
+    }
+
+    try {
+      const { lines } = await readLogFile(file);
+      const entries = lines.map((line, index) => parseLogLine(line, index + 1));
+      const availableLevels = Array.from(new Set(entries.map((entry) => entry.level))).sort();
+      const availableSubsystems = Array.from(
+        new Set(entries.map((entry) => entry.subsystem).filter((value): value is string => Boolean(value))),
+      ).sort();
+      const availableTags = Array.from(new Set(entries.flatMap((entry) => entry.tags))).sort();
+      const filtered = filterLogEntries(entries, query);
+      const startIndex = cursor
+        ? clampCursor(cursor, filtered.length, limit)
+        : tailLogFile(filtered, limit).startIndex;
+      const pageItems = filtered.slice(startIndex, startIndex + limit);
+      const previousCursor = startIndex > 0 ? String(Math.max(0, startIndex - limit)) : undefined;
+      const nextCursor = startIndex + limit < filtered.length ? String(startIndex + limit) : undefined;
+
+      return {
+        collectionStatus: deriveParsedLogStatus(filesResult.collectionStatus, entries),
+        ...withOptionalWarnings(filesResult.warnings),
+        item: {
+          date: file.date,
+          file,
+          items: pageItems,
+          total: filtered.length,
+          limit,
+          ...(cursor ? { cursor } : {}),
+          ...(nextCursor ? { nextCursor } : {}),
+          ...(previousCursor ? { previousCursor } : {}),
+          availableLevels,
+          availableSubsystems,
+          availableTags,
+        },
+      };
+    } catch (error) {
+      const warning = buildLogReadWarning(file.path, error);
+
+      return {
+        collectionStatus: {
+          ...filesResult.collectionStatus,
+          coverage: "partial",
+          warningCount: filesResult.collectionStatus.warningCount + 1,
+        },
+        warnings: [...(filesResult.warnings ?? []), warning],
+        item: {
+          date: file.date,
+          file,
+          items: [],
+          total: 0,
+          limit,
+          ...(cursor ? { cursor } : {}),
+          availableLevels: [],
+          availableSubsystems: [],
+          availableTags: [],
+        },
+      };
+    }
+  }
+
+  async getLogRawFile(date?: string): Promise<AdapterLogRawFileResult> {
+    const filesResult = await this.getLogFiles();
+    const file = selectLogFile(filesResult.items, date);
+
+    if (!file) {
+      return {
+        collectionStatus: filesResult.collectionStatus,
+        ...withOptionalWarnings(filesResult.warnings),
+      };
+    }
+
+    try {
+      const { content, lines } = await readLogFile(file);
+
+      return {
+        collectionStatus: filesResult.collectionStatus,
+        ...withOptionalWarnings(filesResult.warnings),
+        item: {
+          date: file.date,
+          path: file.path,
+          content,
+          lineCount: lines.length,
+          sizeBytes: file.sizeBytes,
+          truncated: false,
+        },
+      };
+    } catch (error) {
+      const warning = buildLogReadWarning(file.path, error);
+
+      return {
+        collectionStatus: {
+          ...filesResult.collectionStatus,
+          coverage: "partial",
+          warningCount: filesResult.collectionStatus.warningCount + 1,
+        },
+        warnings: [...(filesResult.warnings ?? []), warning],
+      };
+    }
+  }
+
+  async getPresence(): Promise<AdapterPresenceResult> {
+    const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
+
+    return {
+      items: gatewayRuntime.collections.presence.items,
+      collectionStatus: gatewayRuntime.configured
+        ? createGatewayCollectionStatus("presence", gatewayRuntime.collections.presence, gatewayRuntime.fetchedAt)
+        : {
+            key: "presence",
+            sourceKind: "gateway-ws",
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningCount: 0,
+          },
+      ...withOptionalWarnings(gatewayRuntime.warnings),
+    };
+  }
+
+  async getNodes(): Promise<AdapterNodesResult> {
+    const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
+
+    return {
+      items: gatewayRuntime.collections.nodes.items,
+      collectionStatus: gatewayRuntime.configured
+        ? createGatewayCollectionStatus("nodes", gatewayRuntime.collections.nodes, gatewayRuntime.fetchedAt)
+        : {
+            key: "nodes",
+            sourceKind: "gateway-ws",
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningCount: 0,
+          },
+      ...withOptionalWarnings(gatewayRuntime.warnings),
+    };
+  }
+
+  async getTools(): Promise<AdapterToolsResult> {
+    const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
+
+    return {
+      items: gatewayRuntime.collections.tools.items,
+      collectionStatus: gatewayRuntime.configured
+        ? createGatewayCollectionStatus("tools", gatewayRuntime.collections.tools, gatewayRuntime.fetchedAt)
+        : {
+            key: "tools",
+            sourceKind: "gateway-ws",
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningCount: 0,
+          },
+      ...withOptionalWarnings(gatewayRuntime.warnings),
+    };
+  }
+
+  async getPlugins(): Promise<AdapterPluginsResult> {
+    const gatewayRuntime = await this.loadGatewayRuntime(this.resolvePaths());
+
+    return {
+      items: gatewayRuntime.collections.plugins.items,
+      collectionStatus: gatewayRuntime.configured
+        ? createGatewayCollectionStatus("plugins", gatewayRuntime.collections.plugins, gatewayRuntime.fetchedAt)
+        : {
+            key: "plugins",
+            sourceKind: "gateway-ws",
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningCount: 0,
+          },
+      ...withOptionalWarnings(gatewayRuntime.warnings),
+    };
+  }
+
   async healthCheck(): Promise<AdapterHealth> {
     const snapshot = await this.fetchSnapshot();
     const degraded = Object.values(snapshot.collections).some((collection) => collection.status !== "complete");
@@ -1809,6 +2805,169 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       details: `agents=${snapshot.agents.length} workspaces=${snapshot.workspaces.length} sessions=${snapshot.sessions.length} source=${snapshot.source}`,
       warnings: snapshot.warnings,
     };
+  }
+
+  private async loadGatewayRuntime(
+    resolved: ResolvedFilesystemPaths,
+    parsedConfig?: ParsedConfigResult,
+  ): Promise<GatewayRuntimeLoadResult> {
+    if (!resolved.gatewayUrl) {
+      return {
+        configured: false,
+        connected: false,
+        fetchedAt: this.clock.now().toISOString(),
+        warnings: [],
+        collections: {
+          presence: {
+            items: [],
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningMessages: [],
+          },
+          nodes: {
+            items: [],
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningMessages: [],
+          },
+          sessions: {
+            items: [],
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningMessages: [],
+          },
+          tools: {
+            items: [],
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningMessages: [],
+          },
+          plugins: {
+            items: [],
+            freshness: "unknown",
+            coverage: "unavailable",
+            warningMessages: [],
+          },
+        },
+      };
+    }
+
+    const nowMs = this.clock.now().getTime();
+
+    if (this.gatewayRuntimeCache && nowMs - this.gatewayRuntimeCache.loadedAtMs <= GATEWAY_WS_CACHE_TTL_MS) {
+      return this.gatewayRuntimeCache.result;
+    }
+
+    if (this.gatewayRuntimeLoadPromise) {
+      return this.gatewayRuntimeLoadPromise;
+    }
+
+    this.gatewayRuntimeLoadPromise = (async () => {
+      const gatewayAuth = await this.resolveGatewayAuth(resolved, parsedConfig);
+
+      try {
+        const client = this.gatewayClientFactory({
+          url: resolved.gatewayUrl as string,
+          timeoutMs: this.gatewayTimeoutMs,
+          clock: this.clock,
+          ...(gatewayAuth.token ? { authToken: gatewayAuth.token } : {}),
+        });
+        const snapshot = await client.readRuntimeSnapshot();
+        const warnings = [
+          ...gatewayAuth.warnings,
+          ...snapshot.presence.warningMessages.map((message) =>
+            warning("OPENCLAW_GATEWAY_PRESENCE_PARTIAL", "warn", message, undefined, GATEWAY_WS_SOURCE_ID),
+          ),
+          ...snapshot.nodes.warningMessages.map((message) =>
+            warning("OPENCLAW_GATEWAY_NODES_PARTIAL", "warn", message, undefined, GATEWAY_WS_SOURCE_ID),
+          ),
+          ...snapshot.sessions.warningMessages.map((message) =>
+            warning("OPENCLAW_GATEWAY_SESSIONS_PARTIAL", "warn", message, "sessions", GATEWAY_WS_SOURCE_ID),
+          ),
+          ...snapshot.tools.warningMessages.map((message) =>
+            warning("OPENCLAW_GATEWAY_TOOLS_PARTIAL", "warn", message, undefined, GATEWAY_WS_SOURCE_ID),
+          ),
+          ...snapshot.plugins.warningMessages.map((message) =>
+            warning("OPENCLAW_GATEWAY_PLUGINS_PARTIAL", "warn", message, undefined, GATEWAY_WS_SOURCE_ID),
+          ),
+        ];
+
+        return {
+          configured: true,
+          connected: true,
+          fetchedAt: snapshot.fetchedAt,
+          warnings,
+          collections: {
+            presence: snapshot.presence,
+            nodes: snapshot.nodes,
+            sessions: snapshot.sessions,
+            tools: snapshot.tools,
+            plugins: snapshot.plugins,
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+
+        return {
+          configured: true,
+          connected: false,
+          fetchedAt: this.clock.now().toISOString(),
+          warnings: [
+            ...gatewayAuth.warnings,
+            warning(
+              "OPENCLAW_GATEWAY_WS_CONNECT_FAILED",
+              "warn",
+              `Gateway WebSocket operator.read snapshot failed: ${message}`,
+              "runtimeStatuses",
+              GATEWAY_WS_SOURCE_ID,
+            ),
+          ],
+          collections: {
+            presence: {
+              items: [],
+              freshness: "unknown",
+              coverage: "unavailable",
+              warningMessages: [message],
+            },
+            nodes: {
+              items: [],
+              freshness: "unknown",
+              coverage: "unavailable",
+              warningMessages: [message],
+            },
+            sessions: {
+              items: [],
+              freshness: "unknown",
+              coverage: "unavailable",
+              warningMessages: [message],
+            },
+            tools: {
+              items: [],
+              freshness: "unknown",
+              coverage: "unavailable",
+              warningMessages: [message],
+            },
+            plugins: {
+              items: [],
+              freshness: "unknown",
+              coverage: "unavailable",
+              warningMessages: [message],
+            },
+          },
+        };
+      }
+    })();
+
+    try {
+      const result = await this.gatewayRuntimeLoadPromise;
+      this.gatewayRuntimeCache = {
+        loadedAtMs: nowMs,
+        result,
+      };
+      return result;
+    } finally {
+      this.gatewayRuntimeLoadPromise = undefined;
+    }
   }
 
   private async findWorkspacePathById(workspaceId: string): Promise<string | undefined> {
@@ -1895,6 +3054,38 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     return undefined;
   }
 
+  private async resolveGatewayAuth(
+    resolved: ResolvedFilesystemPaths,
+    parsedConfig?: ParsedConfigResult,
+  ): Promise<GatewayAuthResolution> {
+    if (resolved.gatewayToken) {
+      return {
+        token: resolved.gatewayToken,
+        warnings: [],
+      };
+    }
+
+    const effectiveParsedConfig =
+      parsedConfig ??
+      (resolved.configFile
+        ? await loadConfigFile(resolved.configFile, 0, new Set<string>(), this.homedir).catch(() => undefined)
+        : undefined);
+
+    if (!effectiveParsedConfig) {
+      return {
+        token: undefined,
+        warnings: [],
+      };
+    }
+
+    return resolveConfiguredGatewayToken({
+      config: effectiveParsedConfig.data,
+      configBaseDir: path.dirname(effectiveParsedConfig.path),
+      runtimeRoot: resolved.runtimeRoot,
+      homedir: this.homedir,
+    });
+  }
+
   private resolvePaths(): ResolvedFilesystemPaths {
     const profile = this.profileInput;
     const runtimeRootInput = this.runtimeRootInput ?? this.stateDirInput;
@@ -1908,7 +3099,14 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       : selectConfigCandidate(resolveCanonicalConfigCandidates(runtimeRoot));
     const workspaceGlob = this.workspaceGlobInput
       ? resolvePathInput(this.workspaceGlobInput, runtimeRoot ?? process.cwd(), this.homedir)
-      : resolveDefaultWorkspaceGlob(this.homedir);
+      : runtimeRootInput
+        ? path.join(runtimeRoot ?? process.cwd(), "workspace*")
+        : resolveDefaultWorkspaceGlob(this.homedir);
+    const logGlob = this.logGlobInput
+      ? resolvePathInput(this.logGlobInput, process.cwd(), this.homedir)
+      : undefined;
+    const gatewayUrl = this.gatewayUrlInput;
+    const gatewayToken = this.gatewayTokenInput;
     const sourceRoot = this.sourceRootInput
       ? resolvePathInput(this.sourceRootInput, process.cwd(), this.homedir)
       : undefined;
@@ -1917,9 +3115,96 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
       runtimeRoot,
       configFile,
       workspaceGlob,
+      logGlob,
+      gatewayUrl,
+      gatewayToken,
       sourceRoot,
       profile,
       configBaseDir,
     };
   }
+}
+
+function selectLogFile<T extends { date: string; isLatest: boolean }>(items: T[], date?: string): T | undefined {
+  if (typeof date === "string" && date.trim().length > 0) {
+    return items.find((item) => item.date === date);
+  }
+
+  return items.find((item) => item.isLatest) ?? items[0];
+}
+
+function normalizeLogLimit(limit?: number): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) {
+    return 200;
+  }
+
+  return Math.min(Math.max(1, Math.trunc(limit)), 500);
+}
+
+function clampCursor(cursor: string, total: number, limit: number): number {
+  const parsed = Number.parseInt(cursor, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return Math.max(0, total - limit);
+  }
+
+  return Math.min(parsed, Math.max(0, total - limit));
+}
+
+function filterLogEntries<T extends { message: string; raw: string; level: string; subsystem?: string; tags: string[] }>(
+  items: T[],
+  query: LogEntriesQuery,
+): T[] {
+  const q = normalizeInput(query.q)?.toLowerCase();
+  const level = normalizeInput(query.level)?.toLowerCase();
+  const subsystem = normalizeInput(query.subsystem)?.toLowerCase();
+  const tag = normalizeInput(query.tag)?.toLowerCase();
+
+  return items.filter((item) => {
+    if (q && !`${item.message} ${item.raw}`.toLowerCase().includes(q)) {
+      return false;
+    }
+    if (level && level !== "all" && item.level.toLowerCase() !== level) {
+      return false;
+    }
+    if (subsystem && subsystem !== "all" && (item.subsystem ?? "").toLowerCase() !== subsystem) {
+      return false;
+    }
+    if (tag && tag !== "all" && !item.tags.some((itemTag) => itemTag.toLowerCase() === tag)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function deriveParsedLogStatus<T extends { parsed: boolean }>(
+  status: AdapterLogFilesResult["collectionStatus"],
+  entries: T[],
+): AdapterLogFilesResult["collectionStatus"] {
+  if (status.coverage === "unavailable" || entries.length === 0) {
+    return status;
+  }
+
+  const parsedCount = entries.filter((entry) => entry.parsed).length;
+  if (parsedCount === entries.length) {
+    return status;
+  }
+
+  return {
+    ...status,
+    coverage: "partial",
+  };
+}
+
+function buildLogReadWarning(filePath: string, error: unknown): SnapshotWarning {
+  return {
+    code: "OPENCLAW_LOG_FILE_READ_FAILED",
+    severity: "warn",
+    message: `Failed to read log file ${filePath}: ${error instanceof Error ? error.message : "unknown error"}`,
+    sourceId: LOG_SOURCE_ID,
+  };
+}
+
+function withOptionalWarnings(warnings: SnapshotWarning[] | undefined): { warnings?: SnapshotWarning[] } {
+  return warnings && warnings.length > 0 ? { warnings } : {};
 }

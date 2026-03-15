@@ -1,3 +1,5 @@
+import type { CoverageSummary } from "./observability.js";
+
 export type IsoDateString = string;
 
 export const SNAPSHOT_SOURCES = ["mock", "openclaw", "mixed"] as const;
@@ -116,6 +118,12 @@ export type RecommendationPriority = (typeof RECOMMENDATION_PRIORITIES)[number];
 export const RECOMMENDATION_SAFETY_LEVELS = ["safe-read-only", "requires-human-review"] as const;
 export type RecommendationSafetyLevel = (typeof RECOMMENDATION_SAFETY_LEVELS)[number];
 
+export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal", "unknown"] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
+export const LOG_FILE_SOURCE_KINDS = ["configured", "default", "glob"] as const;
+export type LogFileSourceKind = (typeof LOG_FILE_SOURCE_KINDS)[number];
+
 export interface SnapshotWarning {
   code: string;
   severity: SnapshotWarningSeverity;
@@ -231,6 +239,111 @@ export interface RuntimeStatus {
   status: EntityStatus;
   observedAt: IsoDateString;
   details: Record<string, string | number | boolean | null>;
+}
+
+export interface LogFile {
+  date: string;
+  path: string;
+  sizeBytes: number;
+  modifiedAt: IsoDateString;
+  sourceKind: LogFileSourceKind;
+  isLatest: boolean;
+}
+
+export interface LogEntryRefs {
+  sessionId?: string;
+  agentId?: string;
+  deviceId?: string;
+  jobId?: string;
+}
+
+export interface LogEntry {
+  id: string;
+  lineNumber: number;
+  ts?: IsoDateString;
+  level: LogLevel;
+  subsystem?: string;
+  message: string;
+  raw: string;
+  parsed: boolean;
+  tags: string[];
+  refs?: LogEntryRefs;
+}
+
+export interface LogSummary {
+  date: string;
+  file?: LogFile;
+  totalLines: number;
+  parsedLines: number;
+  levelCounts: Record<string, number>;
+  signalCounts: Record<string, number>;
+  latestErrorAt?: IsoDateString;
+}
+
+export interface LogEntriesQuery {
+  date?: string;
+  cursor?: string;
+  limit?: number;
+  q?: string;
+  level?: string;
+  subsystem?: string;
+  tag?: string;
+}
+
+export interface LogEntriesPage {
+  date: string;
+  file?: LogFile;
+  items: LogEntry[];
+  total: number;
+  limit: number;
+  cursor?: string;
+  nextCursor?: string;
+  previousCursor?: string;
+  availableLevels: string[];
+  availableSubsystems: string[];
+  availableTags: string[];
+}
+
+export interface LogRawFile {
+  date: string;
+  path: string;
+  content: string;
+  lineCount: number;
+  sizeBytes: number;
+  truncated: boolean;
+}
+
+export interface PresenceEntry {
+  deviceId: string;
+  roles: string[];
+  scopes: string[];
+  online: boolean;
+  lastSeenAt?: IsoDateString;
+}
+
+export interface Node {
+  deviceId: string;
+  roles: string[];
+  scopes: string[];
+  online: boolean;
+  lastSeenAt?: IsoDateString;
+}
+
+export interface Tool {
+  agentId: string;
+  name: string;
+  source: "core" | "plugin";
+  pluginId?: string;
+  optional?: boolean;
+  group?: string;
+}
+
+export interface Plugin {
+  id: string;
+  enabled?: boolean;
+  sourceKind: "gateway" | "filesystem" | "cli-probe";
+  hasRuntimeErrors?: boolean;
+  notes?: string[];
 }
 
 export interface InventorySummary {
@@ -401,6 +514,7 @@ export interface SystemSnapshot {
   generatedAt: IsoDateString;
   origin: SnapshotOrigin;
   collections: Record<CollectionName, CollectionMetadata>;
+  sourceRegistry: CoverageSummary;
   warnings: SnapshotWarning[];
   agents: Agent[];
   workspaces: Workspace[];

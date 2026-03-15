@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { SignalBadge } from "../components/signal-badge.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { overlayApi } from "../lib/api.js";
@@ -63,6 +64,7 @@ export function RisksPage() {
       summary: summaryResponse.data,
       findings: findingsResponse.data,
       targets: targetsResponse.data,
+      meta: findingsResponse.meta,
     };
   }, []);
 
@@ -130,6 +132,8 @@ export function RisksPage() {
         <h2>{t("risks.title")}</h2>
         <p>{t("risks.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <DataState
         loading={loading}

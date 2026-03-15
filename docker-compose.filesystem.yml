@@ -7,20 +7,16 @@ services:
       SIDECAR_HOST: 0.0.0.0
       SIDECAR_PORT: 4310
       OPENCLAW_STATE_DIR: /openclaw-state
-      OPENCLAW_CONFIG_PATH: ${OPENCLAW_CONFIG_PATH:-/openclaw-state/openclaw.json}
       OPENCLAW_PROFILE: ${OPENCLAW_PROFILE:-}
-      OPENCLAW_WORKSPACE_GLOB: ${OPENCLAW_WORKSPACE_GLOB:-/openclaw-state/workspace*}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_SOURCE_ROOT: ${OPENCLAW_SOURCE_ROOT:-}
     ports:
       - "${HOST_SIDECAR_PORT:-4310}:4310"
     volumes:
       - type: bind
-        source: ${OPENCLAW_STATE_DIR_HOST:-/tmp/openclaw-state}
+        source: ${OPENCLAW_STATE_DIR:-/tmp/openclaw-state}
         target: /openclaw-state
-        read_only: true
-      - type: bind
-        source: ${OPENCLAW_WORKSPACE_ROOT_HOST:-/tmp/openclaw-state}
-        target: /openclaw-workspaces
         read_only: true
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4310/health >/dev/null || exit 1"]

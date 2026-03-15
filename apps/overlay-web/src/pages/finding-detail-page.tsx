@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { SignalBadge } from "../components/signal-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
@@ -37,6 +38,7 @@ export function FindingDetailPage() {
       finding,
       evidence: evidenceResponses.map((response) => response.data),
       recommendations: recommendationsResponse.data,
+      meta: findingResponse.meta,
     };
   }, [id]);
 
@@ -51,6 +53,8 @@ export function FindingDetailPage() {
         <h2>{data?.finding.summary ?? t("findingDetail.title")}</h2>
         <p>{t("findingDetail.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (

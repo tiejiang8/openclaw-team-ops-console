@@ -90,6 +90,11 @@ test("createResponseMeta carries collection metadata and snapshot warnings", () 
   });
 
   assert.equal(meta.readOnly, true);
+  assert.equal(meta.fetchedAt, "2026-03-14T00:05:00.000Z");
+  assert.deepEqual(meta.sourceKinds, ["mock", "filesystem"]);
+  assert.equal(meta.freshness, "stale");
+  assert.equal(meta.coverage, "partial");
+  assert.equal(meta.warningCount, 1);
   assert.equal(meta.collections?.agents?.status, "partial");
   assert.equal(meta.collections?.agents?.freshness, "stale");
   assert.equal(meta.warnings?.[0]?.code, "PARTIAL_COLLECTION");

@@ -16,6 +16,15 @@ import type {
   TopologyView,
   Workspace,
 } from "./domain.js";
+import type { ItemResponse, ListResponse, ResponseMeta } from "./contracts.js";
+import {
+  dedupeSourceKinds,
+  deriveCoverage,
+  deriveFreshness,
+  mapSnapshotSourceToSourceKinds,
+  type SourceCollectionStatus,
+  type SourceKind,
+} from "./observability.js";
 
 function tally(values: string[]): Record<string, number> {
   return values.reduce<Record<string, number>>((accumulator, value) => {
@@ -252,15 +261,61 @@ export function createResponseMeta(
   generatedAt: string,
   source: SnapshotSource,
   options?: {
+    fetchedAt?: string;
+    targetId?: string;
     collections?: Partial<Record<CollectionName, CollectionMetadata>>;
-    warnings?: SnapshotWarning[];
+    collectionStatuses?: SourceCollectionStatus[];
+    sourceKinds?: SourceKind[];
+    freshness?: CollectionFreshness;
+    coverage?: CollectionStatus;
+    warnings?: SnapshotWarning[] | undefined;
+    warningCount?: number;
   },
-) {
+): ResponseMeta {
+  const warnings = options?.warnings ?? [];
+  const derivedWarningCount =
+    typeof options?.warningCount === "number"
+      ? options.warningCount
+      : warnings.length > 0
+      ? warnings.length
+      : Object.values(options?.collections ?? {}).reduce((count, collection) => count + (collection?.warnings.length ?? 0), 0);
+  const sourceKinds = dedupeSourceKinds(
+    options?.sourceKinds ??
+      (options?.collectionStatuses?.map((collection) => collection.sourceKind) ?? mapSnapshotSourceToSourceKinds(source)),
+  );
+
   return {
     generatedAt,
+    fetchedAt: options?.fetchedAt ?? generatedAt,
     source,
+    sourceKinds,
     readOnly: true as const,
+    freshness: options?.freshness ?? deriveFreshness(options?.collections, options?.collectionStatuses),
+    coverage: options?.coverage ?? deriveCoverage(options?.collections, options?.collectionStatuses),
+    ...(options?.targetId ? { targetId: options.targetId } : {}),
     ...(options?.collections ? { collections: options.collections } : {}),
+    ...(options?.collectionStatuses ? { collectionStatuses: options.collectionStatuses } : {}),
     ...(options?.warnings && options.warnings.length > 0 ? { warnings: options.warnings } : {}),
+    warningCount: derivedWarningCount,
+  };
+}
+
+export function createListResponse<T>(items: T[], meta: ResponseMeta): ListResponse<T> {
+  return {
+    data: items,
+    items,
+    total: items.length,
+    meta: {
+      ...meta,
+      count: items.length,
+    },
+  };
+}
+
+export function createItemResponse<T>(item: T, meta: ResponseMeta): ItemResponse<T> {
+  return {
+    data: item,
+    item,
+    meta,
   };
 }

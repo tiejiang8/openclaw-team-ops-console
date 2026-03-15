@@ -3,12 +3,22 @@ import type {
   AgentsResponse,
   AuthProfilesResponse,
   BindingsResponse,
+  CoverageResponse,
   HealthResponse,
+  LogEntriesQuery,
+  LogEntriesResponse,
+  LogFilesResponse,
+  LogRawFileResponse,
+  LogSummaryResponse,
+  NodesResponse,
+  PluginsResponse,
+  PresenceResponse,
   SummaryResponse,
   TargetResponse,
   TargetsResponse,
   TargetSummaryResponse,
   TopologyResponse,
+  ToolsResponse,
   WorkspaceDocumentResponse,
   WorkspacesResponse,
   SessionsResponse,
@@ -38,6 +48,48 @@ export class SidecarClient {
 
   async getTargets(): Promise<TargetsResponse> {
     return this.request<TargetsResponse>("/sidecar/targets");
+  }
+
+  async getCoverage(): Promise<CoverageResponse> {
+    return this.request<CoverageResponse>("/sidecar/coverage");
+  }
+
+  async getLogFiles(): Promise<LogFilesResponse> {
+    return this.request<LogFilesResponse>("/sidecar/logs/files");
+  }
+
+  async getLogSummary(date?: string): Promise<LogSummaryResponse> {
+    return this.request<LogSummaryResponse>(withQuery("/sidecar/logs/summary", {
+      ...(date ? { date } : {}),
+    }));
+  }
+
+  async getLogEntries(query: LogEntriesQuery = {}): Promise<LogEntriesResponse> {
+    return this.request<LogEntriesResponse>(
+      withQuery("/sidecar/logs/entries", {
+        ...(query.date ? { date: query.date } : {}),
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+        ...(typeof query.limit === "number" ? { limit: String(query.limit) } : {}),
+        ...(query.q ? { q: query.q } : {}),
+        ...(query.level ? { level: query.level } : {}),
+        ...(query.subsystem ? { subsystem: query.subsystem } : {}),
+        ...(query.tag ? { tag: query.tag } : {}),
+      }),
+    );
+  }
+
+  async getLogRawFile(date: string): Promise<LogRawFileResponse | undefined> {
+    const response = await this.fetch(`/sidecar/logs/files/${encodeURIComponent(date)}/raw`);
+
+    if (response.status === 404) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Sidecar returned ${response.status} for log raw file ${date}`);
+    }
+
+    return (await response.json()) as LogRawFileResponse;
   }
 
   async getTargetById(id: string): Promise<TargetResponse | undefined> {
@@ -110,6 +162,22 @@ export class SidecarClient {
     return this.request<SessionsResponse>("/sidecar/sessions");
   }
 
+  async getPresence(): Promise<PresenceResponse> {
+    return this.request<PresenceResponse>("/sidecar/presence");
+  }
+
+  async getNodes(): Promise<NodesResponse> {
+    return this.request<NodesResponse>("/sidecar/nodes");
+  }
+
+  async getTools(): Promise<ToolsResponse> {
+    return this.request<ToolsResponse>("/sidecar/tools");
+  }
+
+  async getPlugins(): Promise<PluginsResponse> {
+    return this.request<PluginsResponse>("/sidecar/plugins");
+  }
+
   async getBindings(): Promise<BindingsResponse> {
     return this.request<BindingsResponse>("/sidecar/bindings");
   }
@@ -149,4 +217,17 @@ export class SidecarClient {
       clearTimeout(timeout);
     }
   }
+}
+
+function withQuery(path: string, query: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value === "string" && value.length > 0) {
+      params.set(key, value);
+    }
+  }
+
+  const queryString = params.toString();
+  return queryString.length > 0 ? `${path}?${queryString}` : path;
 }

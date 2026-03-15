@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
@@ -60,6 +61,7 @@ export function TargetDetailPage() {
     return {
       target: targetResponse.data,
       summary: targetSummaryResponse.data,
+      meta: targetSummaryResponse.meta,
     };
   }, [id]);
 
@@ -97,6 +99,8 @@ export function TargetDetailPage() {
         <h2>{data?.target.name ?? t("targetDetail.title")}</h2>
         <p>{t("targetDetail.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (

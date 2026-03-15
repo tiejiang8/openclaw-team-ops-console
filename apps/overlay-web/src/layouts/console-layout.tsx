@@ -8,6 +8,8 @@ export function ConsoleLayout() {
   const navItems = [
     { to: "/", label: t("nav.overview") },
     { to: "/targets", label: t("nav.targets") },
+    { to: "/coverage", label: t("nav.coverage") },
+    { to: "/logs", label: t("nav.logs") },
     { to: "/risks", label: t("nav.risks") },
     { to: "/findings", label: t("nav.findings") },
     { to: "/evidence", label: t("nav.evidence") },

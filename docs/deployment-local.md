@@ -31,7 +31,7 @@ Create a local env file if you want to override defaults:
 cp .env.example .env
 ```
 
-Default behavior is suitable for local evaluation. Mock mode remains the default unless local runtime paths or a target registry file are configured.
+Default behavior is suitable for local evaluation. Mock mode remains the default unless you replace `OPENCLAW_STATE_DIR=/path/to/your/.openclaw` with a real local OpenClaw path or configure a target registry file.
 
 ## Process-mode startup
 
@@ -69,8 +69,6 @@ Typical startup:
 
 ```bash
 OPENCLAW_STATE_DIR=~/.openclaw \
-OPENCLAW_CONFIG_PATH=~/.openclaw/openclaw.json \
-OPENCLAW_WORKSPACE_GLOB='~/.openclaw/workspace*' \
 OPENCLAW_SOURCE_ROOT=~/openclaw \
 corepack pnpm dev
 ```
@@ -133,14 +131,14 @@ Use the filesystem compose when you want containerized startup against a real lo
 Prepare the env file:
 
 ```bash
-cp .env.filesystem.example .env.filesystem
-# update the placeholder host paths in .env.filesystem before starting
+cp .env.example .env
+# replace OPENCLAW_STATE_DIR with your real local OpenClaw path first
 ```
 
 Start:
 
 ```bash
-docker compose --env-file .env.filesystem -f docker-compose.filesystem.yml up --build
+docker compose -f docker-compose.filesystem.yml up --build
 ```
 
 Stop:
@@ -157,8 +155,9 @@ docker compose -f docker-compose.filesystem.yml logs -f
 
 Filesystem compose notes:
 
-- sidecar uses `OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`, and `OPENCLAW_PROFILE` as the primary container-side OpenClaw envs
-- `OPENCLAW_WORKSPACE_GLOB` is kept as an optional override only
+- sidecar uses `OPENCLAW_STATE_DIR=/openclaw-state` inside the container
+- `OPENCLAW_PROFILE` stays optional
+- config and workspace defaults are derived from that mounted state dir
 - host OpenClaw paths are bind-mounted read-only
 - the existing three-service topology and healthcheck structure remain unchanged
 
@@ -173,7 +172,7 @@ Compose includes healthchecks for:
 Filesystem compose config validation:
 
 ```bash
-docker compose --env-file .env.filesystem.example -f docker-compose.filesystem.yml config
+docker compose -f docker-compose.filesystem.yml config
 ```
 
 ## Quality verification

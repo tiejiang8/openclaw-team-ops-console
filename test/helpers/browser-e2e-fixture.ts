@@ -190,6 +190,21 @@ export async function withGovernanceBrowserFixture<T>(
   scenario: MockAdapterScenario,
   run: (fixture: GovernanceBrowserFixture) => Promise<T>,
 ): Promise<T> {
+  return withSidecarBrowserFixture(createSidecarApp(new MockOpenClawAdapter({ scenario })), scenario, run);
+}
+
+export async function withCustomSidecarBrowserFixture<T>(
+  sidecarApp: ListenTarget,
+  run: (fixture: GovernanceBrowserFixture) => Promise<T>,
+): Promise<T> {
+  return withSidecarBrowserFixture(sidecarApp, "baseline", run);
+}
+
+async function withSidecarBrowserFixture<T>(
+  sidecarApp: ListenTarget,
+  scenario: MockAdapterScenario,
+  run: (fixture: GovernanceBrowserFixture) => Promise<T>,
+): Promise<T> {
   await ensureWebBuildExists();
 
   const launchEnvironment =
@@ -200,7 +215,7 @@ export async function withGovernanceBrowserFixture<T>(
         }
       : process.env;
 
-  const sidecar = await startServer(createSidecarApp(new MockOpenClawAdapter({ scenario })));
+  const sidecar = await startServer(sidecarApp);
   const api = await startServer(
     createOverlayApiApp(
       new SidecarClient({

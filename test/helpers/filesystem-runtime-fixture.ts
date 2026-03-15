@@ -1,6 +1,11 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+
+interface FixtureLogFile {
+  date: string;
+  lines: string[];
+}
 
 export interface FilesystemRuntimeFixtureOptions {
   profile?: string;
@@ -10,6 +15,8 @@ export interface FilesystemRuntimeFixtureOptions {
   runtimeOnlyAgentIds?: string[];
   includeLegacyMainSessionStore?: boolean;
   includeModernMainSessionStore?: boolean;
+  logFiles?: FixtureLogFile[];
+  loggingFile?: string;
 }
 
 export interface FilesystemRuntimeFixture {
@@ -19,6 +26,8 @@ export interface FilesystemRuntimeFixture {
   configFile: string;
   workspaceGlob: string;
   sourceRoot: string;
+  logDir: string;
+  logFilePaths: string[];
   cleanup(): Promise<void>;
 }
 
@@ -53,6 +62,7 @@ export async function createFilesystemRuntimeFixture(
   const rootDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-ops-fs-"));
   const { homeDir, runtimeRoot } = resolveFixtureStateDir(rootDir, options.profile);
   const sourceRoot = path.join(rootDir, "openclaw-source");
+  const logDir = path.join(runtimeRoot, "logs");
   const workspaceMain = path.join(runtimeRoot, "workspace-main");
   const workspaceOps = path.join(runtimeRoot, "workspace-ops");
   const configFile = path.join(runtimeRoot, "openclaw.json");
@@ -70,9 +80,26 @@ export async function createFilesystemRuntimeFixture(
   await mkdir(path.join(runtimeRoot, "agents", "main", "agent"), { recursive: true });
   await mkdir(path.join(runtimeRoot, "agents", "ops", "agent"), { recursive: true });
   await mkdir(sourceRoot, { recursive: true });
+  await mkdir(logDir, { recursive: true });
   await mkdir(path.join(workspaceMain, "memory"), { recursive: true });
   await mkdir(path.join(workspaceMain, "skills"), { recursive: true });
   await mkdir(path.dirname(modernMainSessionStorePath), { recursive: true });
+
+  const logFilePaths = await Promise.all(
+    (options.logFiles ?? []).map(async (logFile) => {
+      const targetPath = path.join(logDir, `openclaw-${logFile.date}.log`);
+      const content = logFile.lines.join("\n");
+
+      await writeFile(targetPath, content.endsWith("\n") ? content : `${content}\n`);
+
+      const timestamp = new Date(`${logFile.date}T23:59:59.000Z`);
+      if (!Number.isNaN(timestamp.valueOf())) {
+        await utimes(targetPath, timestamp, timestamp);
+      }
+
+      return targetPath;
+    }),
+  );
 
   for (const runtimeOnlyAgentId of runtimeOnlyAgentIds) {
     await mkdir(path.join(runtimeRoot, "agents", runtimeOnlyAgentId, "agent"), { recursive: true });
@@ -90,6 +117,11 @@ export async function createFilesystemRuntimeFixture(
   await writeFile(
     configFile,
     `{
+      ${
+        options.loggingFile
+          ? `logging: { file: ${JSON.stringify(options.loggingFile)} },`
+          : ""
+      }
       agents: { $include: "./agents.json5" },
       ${
         options.sessionStoreTemplate
@@ -202,6 +234,8 @@ export async function createFilesystemRuntimeFixture(
     configFile,
     workspaceGlob: path.join(runtimeRoot, "workspace*"),
     sourceRoot,
+    logDir,
+    logFilePaths,
     cleanup: () => rm(rootDir, { recursive: true, force: true }),
   };
 }

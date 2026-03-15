@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DataState } from "../components/data-state.js";
+import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
@@ -52,6 +53,7 @@ export function WorkspacesPage() {
       workspaces: workspacesResponse.data,
       agents: agentsResponse.data,
       sessions: sessionsResponse.data,
+      meta: workspacesResponse.meta,
     };
   }, []);
 
@@ -189,6 +191,8 @@ export function WorkspacesPage() {
         <h2>{t("workspaces.title")}</h2>
         <p>{t("workspaces.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input

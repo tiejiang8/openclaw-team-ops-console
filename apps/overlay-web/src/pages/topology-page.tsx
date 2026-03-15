@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { DataState } from "../components/data-state.js";
 import { MetricCard } from "../components/metric-card.js";
+import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
@@ -120,6 +121,8 @@ export function TopologyPage() {
         <h2>{t("topology.title")}</h2>
         <p>{t("topology.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (

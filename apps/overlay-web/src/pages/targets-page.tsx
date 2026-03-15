@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
+import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, SortableHeader, TableToolbar } from "../components/table-controls.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { overlayApi } from "../lib/api.js";
@@ -137,6 +138,8 @@ export function TargetsPage() {
         <h2>{t("targets.title")}</h2>
         <p>{t("targets.description")}</p>
       </header>
+
+      <PageObservability meta={data?.meta} />
 
       <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
         <input

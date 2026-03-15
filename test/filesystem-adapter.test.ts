@@ -142,6 +142,25 @@ test("filesystem adapter falls back runtime-only agents to workspace-<agentId> a
   }
 });
 
+test("filesystem adapter derives config and workspace discovery from OPENCLAW_STATE_DIR alone", async () => {
+  const fixture = await createFilesystemRuntimeFixture();
+
+  try {
+    const adapter = new FilesystemOpenClawAdapter({
+      stateDir: fixture.runtimeRoot,
+      homedir: () => fixture.homeDir,
+    });
+    const snapshot = await adapter.fetchSnapshot();
+
+    assert.equal(snapshot.collections.agents.status, "complete");
+    assert.equal(snapshot.agents.length, 2);
+    assert.ok(snapshot.workspaces.some((workspace) => workspace.name === "workspace-main"));
+    assert.ok(snapshot.workspaces.some((workspace) => workspace.name === "workspace-ops"));
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 test("filesystem adapter reads the documented legacy single-agent session store path", async () => {
   const fixture = await createFilesystemRuntimeFixture({
     includeModernMainSessionStore: false,
@@ -186,6 +205,52 @@ test("filesystem adapter returns workspace markdown content for discovered core 
     assert.equal(document.workspaceId, workspaceWithDocs.id);
     assert.equal(document.fileName, "BOOT.md");
     assert.match(document.content, /# Main boot/);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("filesystem adapter exposes read-only log files, summaries, entries, and raw content", async () => {
+  const fixture = await createFilesystemRuntimeFixture({
+    logFiles: [
+      {
+        date: "2026-03-14",
+        lines: ['{"ts":"2026-03-14T07:00:00.000Z","level":"info","subsystem":"cron","message":"cron warmup"}'],
+      },
+      {
+        date: "2026-03-15",
+        lines: [
+          '{"ts":"2026-03-15T09:00:00.000Z","level":"warn","subsystem":"gateway","message":"Gateway disconnected sessionId=session-1 deviceId=device-1"}',
+          "2026-03-15T10:00:00.000Z INFO cron scheduled jobId=job-1 agentId=main",
+        ],
+      },
+    ],
+  });
+
+  try {
+    const adapter = new FilesystemOpenClawAdapter({
+      runtimeRoot: fixture.runtimeRoot,
+      configFile: fixture.configFile,
+      workspaceGlob: fixture.workspaceGlob,
+      logGlob: path.join(fixture.logDir, "openclaw-*.log"),
+      homedir: () => fixture.homeDir,
+    });
+
+    const files = await adapter.getLogFiles();
+    const summary = await adapter.getLogSummary();
+    const entries = await adapter.getLogEntries({ tag: "session" });
+    const rawFile = await adapter.getLogRawFile("2026-03-15");
+
+    assert.equal(files.collectionStatus.coverage, "complete");
+    assert.equal(files.items.length, 2);
+    assert.equal(files.items[0]?.date, "2026-03-15");
+    assert.equal(summary.item.totalLines, 2);
+    assert.equal(summary.item.levelCounts.warn, 1);
+    assert.equal(summary.item.signalCounts.disconnect, 1);
+    assert.equal(entries.item.total, 1);
+    assert.ok(entries.item.items[0]?.tags.includes("session"));
+    assert.ok(rawFile.item);
+    assert.match(rawFile.item?.content ?? "", /Gateway disconnected/);
   } finally {
     await fixture.cleanup();
   }

@@ -1,6 +1,23 @@
-import type { AdapterSourceDescriptor, SystemSnapshot, WorkspaceDocument } from "@openclaw-team-ops/shared";
+import type {
+  AdapterSourceDescriptor,
+  LogEntriesQuery,
+  LogLevel,
+  SystemSnapshot,
+  WorkspaceDocument,
+} from "@openclaw-team-ops/shared";
 
-import type { AdapterHealth, SidecarInventoryAdapter } from "../source-adapter.js";
+import type {
+  AdapterHealth,
+  AdapterLogEntriesResult,
+  AdapterLogFilesResult,
+  AdapterLogRawFileResult,
+  AdapterLogSummaryResult,
+  AdapterNodesResult,
+  AdapterPluginsResult,
+  AdapterPresenceResult,
+  AdapterToolsResult,
+  SidecarInventoryAdapter,
+} from "../source-adapter.js";
 import {
   buildMockSnapshot,
   buildMockWorkspaceDocument,
@@ -72,6 +89,167 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
     return buildMockWorkspaceDocument(workspaceId, fileName, normalizeMockScenario(this.scenario));
   }
 
+  async getLogFiles(): Promise<AdapterLogFilesResult> {
+    return {
+      items: [],
+      collectionStatus: {
+        key: "logs",
+        sourceKind: "mock",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 1,
+      },
+      warnings: [
+        {
+          code: "MOCK_LOGS_UNAVAILABLE",
+          severity: "info",
+          message: "Mock mode does not provide filesystem-backed OpenClaw log files.",
+          sourceId: `mock:${this.scenario}`,
+        },
+      ],
+    };
+  }
+
+  async getLogSummary(date?: string): Promise<AdapterLogSummaryResult> {
+    const files = await this.getLogFiles();
+
+    return {
+      collectionStatus: files.collectionStatus,
+      ...(files.warnings ? { warnings: files.warnings } : {}),
+      item: {
+        date: date ?? new Date().toISOString().slice(0, 10),
+        totalLines: 0,
+        parsedLines: 0,
+        levelCounts: buildEmptyLevelCounts(),
+        signalCounts: {},
+      },
+    };
+  }
+
+  async getLogEntries(query: LogEntriesQuery): Promise<AdapterLogEntriesResult> {
+    const files = await this.getLogFiles();
+
+    return {
+      collectionStatus: files.collectionStatus,
+      ...(files.warnings ? { warnings: files.warnings } : {}),
+      item: {
+        date: query.date ?? new Date().toISOString().slice(0, 10),
+        items: [],
+        total: 0,
+        limit: normalizeLimit(query.limit),
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+        availableLevels: [],
+        availableSubsystems: [],
+        availableTags: [],
+      },
+    };
+  }
+
+  async getLogRawFile(date?: string): Promise<AdapterLogRawFileResult> {
+    const files = await this.getLogFiles();
+
+    return {
+      collectionStatus: files.collectionStatus,
+      ...(files.warnings ? { warnings: files.warnings } : {}),
+      ...(date
+        ? {
+            item: {
+              date,
+              path: "",
+              content: "",
+              lineCount: 0,
+              sizeBytes: 0,
+              truncated: false,
+            },
+          }
+        : {}),
+    };
+  }
+
+  async getPresence(): Promise<AdapterPresenceResult> {
+    return {
+      items: [],
+      collectionStatus: {
+        key: "presence",
+        sourceKind: "mock",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 1,
+      },
+      warnings: [
+        {
+          code: "MOCK_GATEWAY_PRESENCE_UNAVAILABLE",
+          severity: "info",
+          message: "Mock mode does not provide Gateway WebSocket presence data.",
+          sourceId: `mock:${this.scenario}`,
+        },
+      ],
+    };
+  }
+
+  async getNodes(): Promise<AdapterNodesResult> {
+    return {
+      items: [],
+      collectionStatus: {
+        key: "nodes",
+        sourceKind: "mock",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 1,
+      },
+      warnings: [
+        {
+          code: "MOCK_GATEWAY_NODES_UNAVAILABLE",
+          severity: "info",
+          message: "Mock mode does not provide Gateway WebSocket node inventory.",
+          sourceId: `mock:${this.scenario}`,
+        },
+      ],
+    };
+  }
+
+  async getTools(): Promise<AdapterToolsResult> {
+    return {
+      items: [],
+      collectionStatus: {
+        key: "tools",
+        sourceKind: "mock",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 1,
+      },
+      warnings: [
+        {
+          code: "MOCK_GATEWAY_TOOLS_UNAVAILABLE",
+          severity: "info",
+          message: "Mock mode does not provide Gateway WebSocket tools.catalog data.",
+          sourceId: `mock:${this.scenario}`,
+        },
+      ],
+    };
+  }
+
+  async getPlugins(): Promise<AdapterPluginsResult> {
+    return {
+      items: [],
+      collectionStatus: {
+        key: "plugins",
+        sourceKind: "mock",
+        freshness: "unknown",
+        coverage: "unavailable",
+        warningCount: 1,
+      },
+      warnings: [
+        {
+          code: "MOCK_GATEWAY_PLUGINS_UNAVAILABLE",
+          severity: "info",
+          message: "Mock mode does not provide Gateway WebSocket plugin runtime inventory.",
+          sourceId: `mock:${this.scenario}`,
+        },
+      ],
+    };
+  }
+
   async healthCheck(): Promise<AdapterHealth> {
     const observedAt = new Date().toISOString();
 
@@ -114,4 +292,20 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
         : {}),
     };
   }
+}
+
+function buildEmptyLevelCounts(): Record<LogLevel, number> {
+  return {
+    trace: 0,
+    debug: 0,
+    info: 0,
+    warn: 0,
+    error: 0,
+    fatal: 0,
+    unknown: 0,
+  };
+}
+
+function normalizeLimit(limit?: number): number {
+  return typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.min(Math.trunc(limit), 500) : 200;
 }

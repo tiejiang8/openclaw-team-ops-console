@@ -3,11 +3,16 @@ import type { AddressInfo } from "node:net";
 import test from "node:test";
 
 import type {
+  CoverageResponse,
   EvidenceResponse,
   EvidencesResponse,
   ErrorResponse,
   FindingResponse,
   FindingsResponse,
+  LogEntriesResponse,
+  LogFilesResponse,
+  LogRawFileResponse,
+  LogSummaryResponse,
   RecommendationsResponse,
   RisksSummaryResponse,
   SummaryResponse,
@@ -75,6 +80,51 @@ async function withApiStack<T>(scenario: MockAdapterScenario, run: (apiBaseUrl: 
   }
 }
 
+async function withFilesystemApiStack<T>(run: (apiBaseUrl: string) => Promise<T>): Promise<T> {
+  const fixture = await createFilesystemRuntimeFixture({
+    logFiles: [
+      {
+        date: "2026-03-14",
+        lines: ['{"ts":"2026-03-14T07:00:00.000Z","level":"info","subsystem":"cron","message":"cron warmup"}'],
+      },
+      {
+        date: "2026-03-15",
+        lines: [
+          '{"ts":"2026-03-15T09:00:00.000Z","level":"warn","subsystem":"gateway","message":"Gateway disconnected sessionId=session-1 deviceId=device-1"}',
+          "2026-03-15T10:00:00.000Z INFO plugin plugin ready agentId=main",
+        ],
+      },
+    ],
+  });
+  const sidecar = await startServer(
+    createSidecarApp(
+      new FilesystemOpenClawAdapter({
+        runtimeRoot: fixture.runtimeRoot,
+        configFile: fixture.configFile,
+        workspaceGlob: fixture.workspaceGlob,
+        logGlob: `${fixture.logDir}/openclaw-*.log`,
+        homedir: () => fixture.homeDir,
+      }),
+    ),
+  );
+  const api = await startServer(
+    createOverlayApiApp(
+      new SidecarClient({
+        baseUrl: sidecar.url,
+        timeoutMs: 5000,
+      }),
+    ),
+  );
+
+  try {
+    return await run(api.url);
+  } finally {
+    await api.close();
+    await sidecar.close();
+    await fixture.cleanup();
+  }
+}
+
 test("overlay api summary remains read-only and includes collection metadata", async () => {
   await withApiStack("baseline", async (apiBaseUrl) => {
     const response = await fetch(`${apiBaseUrl}/api/summary`);
@@ -86,6 +136,31 @@ test("overlay api summary remains read-only and includes collection metadata", a
     assert.equal(body.meta.collections?.agents?.status, "complete");
     assert.equal(body.meta.collections?.runtimeStatuses?.recordCount, body.runtimeStatuses.length);
     assert.ok(body.runtimeStatuses.some((status) => status.componentId === "overlay-api"));
+  });
+});
+
+test("overlay api exposes collection coverage and planned source gaps", async () => {
+  await withApiStack("partial-coverage", async (apiBaseUrl) => {
+    const response = await fetch(`${apiBaseUrl}/api/coverage`);
+    const body = (await response.json()) as CoverageResponse;
+
+    assert.equal(response.status, 200);
+    assert.equal(body.meta.readOnly, true);
+    assert.equal(body.meta.coverage, "partial");
+    assert.ok(body.meta.sourceKinds.includes("mock"));
+    assert.ok(body.data.collections.some((collection) => collection.key === "agents" && collection.coverage === "complete"));
+    assert.ok(
+      body.data.collections.some(
+        (collection) =>
+          collection.key === "logs" && collection.sourceKind === "filesystem" && collection.coverage === "unavailable",
+      ),
+    );
+    assert.ok(
+      body.data.collections.some(
+        (collection) =>
+          collection.key === "nodes" && collection.sourceKind === "gateway-ws" && collection.coverage === "unavailable",
+      ),
+    );
   });
 });
 
@@ -195,6 +270,41 @@ test("overlay api stays GET-only for inventory endpoints", async () => {
     });
 
     assert.equal(response.status, 404);
+  });
+});
+
+test("overlay api exposes read-only logs files, summaries, entries, and raw file content", async () => {
+  await withFilesystemApiStack(async (apiBaseUrl) => {
+    const filesResponse = await fetch(`${apiBaseUrl}/api/logs/files`);
+    const filesBody = (await filesResponse.json()) as LogFilesResponse;
+
+    assert.equal(filesResponse.status, 200);
+    assert.equal(filesBody.meta.readOnly, true);
+    assert.equal(filesBody.meta.coverage, "complete");
+    assert.equal(filesBody.data[0]?.date, "2026-03-15");
+
+    const summaryResponse = await fetch(`${apiBaseUrl}/api/logs/summary`);
+    const summaryBody = (await summaryResponse.json()) as LogSummaryResponse;
+
+    assert.equal(summaryResponse.status, 200);
+    assert.equal(summaryBody.meta.readOnly, true);
+    assert.equal(summaryBody.data.totalLines, 2);
+    assert.equal(summaryBody.data.signalCounts.disconnect, 1);
+
+    const entriesResponse = await fetch(`${apiBaseUrl}/api/logs/entries?tag=session`);
+    const entriesBody = (await entriesResponse.json()) as LogEntriesResponse;
+
+    assert.equal(entriesResponse.status, 200);
+    assert.equal(entriesBody.meta.readOnly, true);
+    assert.equal(entriesBody.data.total, 1);
+    assert.equal(entriesBody.data.items[0]?.refs?.sessionId, "session-1");
+
+    const rawResponse = await fetch(`${apiBaseUrl}/api/logs/files/2026-03-15/raw`);
+    const rawBody = (await rawResponse.json()) as LogRawFileResponse;
+
+    assert.equal(rawResponse.status, 200);
+    assert.equal(rawBody.meta.readOnly, true);
+    assert.match(rawBody.data.content, /Gateway disconnected/);
   });
 });
 

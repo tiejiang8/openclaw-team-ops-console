@@ -25,6 +25,6 @@ app.listen(port, host, () => {
 
   console.log("[sidecar] mode=read-only source=openclaw adapter=filesystem");
   console.log(
-    `[sidecar] runtimeRoot=${process.env.OPENCLAW_RUNTIME_ROOT ?? process.env.OPENCLAW_STATE_DIR ?? "(derived or unset)"} configFile=${process.env.OPENCLAW_CONFIG_FILE ?? process.env.OPENCLAW_CONFIG_PATH ?? "(derived or unset)"} workspaceGlob=${process.env.OPENCLAW_WORKSPACE_GLOB ?? "(derived official default)"} profile=${process.env.OPENCLAW_PROFILE ?? "(default)"}`,
+    `[sidecar] runtimeRoot=${process.env.OPENCLAW_RUNTIME_ROOT ?? process.env.OPENCLAW_STATE_DIR ?? "(derived or unset)"} configFile=${process.env.OPENCLAW_CONFIG_FILE ?? process.env.OPENCLAW_CONFIG_PATH ?? "(derived or unset)"} workspaceGlob=${process.env.OPENCLAW_WORKSPACE_GLOB ?? "(derived official default)"} logGlob=${process.env.OPENCLAW_LOG_GLOB ?? "(auto-discover configured/default logs)"} profile=${process.env.OPENCLAW_PROFILE ?? "(default)"}`,
   );
 });
