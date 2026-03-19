@@ -35,8 +35,8 @@ export function createOverlayApiApp(sidecarClient: SidecarClient): Express {
   app.use(cors());
   app.use(express.json({ limit: "250kb" }));
   
-  // Existing API routes
-  app.use("/api", createApiRouter(overlayService, sidecarClient));
+  // Main API routes (routes already include /health, /api/*, etc.)
+  app.use("/", createApiRouter(overlayService, sidecarClient));
   
   // New bootstrap and fleet map routes
   app.use("/api/bootstrap", createBootstrapRouter(bootstrapController));

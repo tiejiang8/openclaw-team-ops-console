@@ -8,6 +8,7 @@ export function ConsoleLayout() {
   const { language, setLanguage, t } = useI18n();
   const navItems = [
     { to: "/", label: t("nav.overview") },
+    { to: "/fleet-map", label: t("nav.fleetMap") },
     { to: "/targets", label: t("nav.targets") },
     { to: "/coverage", label: t("nav.coverage") },
     { to: "/logs", label: t("nav.logs") },
@@ -24,7 +25,6 @@ export function ConsoleLayout() {
     { to: "/bindings", label: t("nav.bindings") },
     { to: "/auth-profiles", label: t("nav.authProfiles") },
     { to: "/topology", label: t("nav.topology") },
-    { to: "/fleet-map", label: t("nav.fleetMap") },
   ];
 
   return (
