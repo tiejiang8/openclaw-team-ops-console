@@ -24,7 +24,7 @@ function buildChips(
   return [
     `${t("runtime.target")}: ${resolveTargetLabel(runtime, t)}`,
     `${t("runtime.sourceMode")}: ${translateRuntimeMode(runtime.sourceMode, t)}`,
-    `${t("runtime.gateway")}: ${runtime.gateway.dataReaderHealth === "healthy" || runtime.gateway.dataReaderHealth === "partial" ? t("common.status.ok") : translateStatus(runtime.gateway.connectionState)}`,
+    `${t("runtime.gateway")}: ${runtime.gateway.dataReaderHealth === "healthy" || runtime.gateway.dataReaderHealth === "partial" ? t("status.ok") : translateStatus(runtime.gateway.connectionState)}`,
     `${t("runtime.openclaw")}: ${translateStatus(runtime.openclaw.overall)}`,
     `${t("runtime.nodes")}: ${t("runtime.nodesSummary", { connected: runtime.nodes.connected, paired: runtime.nodes.paired })}`,
     `${t("runtime.cron")}: ${t("runtime.cronSummary", { total: runtime.cron.total, overdue: runtime.cron.overdue })}`,
@@ -42,7 +42,7 @@ export function RuntimeStatusBar() {
       <div className="runtime-status-bar-header">
         <span className="runtime-status-bar-title">{t("runtime.barTitle")}</span>
         <span className={`runtime-pill runtime-pill-${runtime ? (runtime.gateway.dataReaderHealth === "healthy" || runtime.gateway.dataReaderHealth === "partial" ? "connected" : runtime.gateway.connectionState) : "unknown"}`}>
-          {runtime ? `${t("runtime.gateway")}: ${runtime.gateway.dataReaderHealth === "healthy" || runtime.gateway.dataReaderHealth === "partial" ? t("common.status.ok") : translateStatus(runtime.gateway.connectionState)}` : t("runtime.loading")}
+          {runtime ? `${t("runtime.gateway")}: ${runtime.gateway.dataReaderHealth === "healthy" || runtime.gateway.dataReaderHealth === "partial" ? t("status.ok") : translateStatus(runtime.gateway.connectionState)}` : t("runtime.loading")}
         </span>
       </div>
 
