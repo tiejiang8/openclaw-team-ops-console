@@ -26,7 +26,8 @@ export class BootstrapStatusService {
     let configFileResolved: string | undefined;
     let workspaceResolved: string | undefined;
     let gatewayUrlResolved: string | undefined;
-    let gatewayReachable = false;
+    let gatewayTransportReachable = false;
+    let gatewayDataPlaneHealthy = false;
     let gatewayAuthMode: "none" | "explicit" | "auto-from-openclaw-json" = "none";
     let operatorReadReady = false;
 
@@ -56,7 +57,7 @@ export class BootstrapStatusService {
         });
       }
 
-      const dataPlaneHealthy = await this.adapter.isDataPlaneHealthy();
+      gatewayDataPlaneHealthy = await this.adapter.isDataPlaneHealthy();
 
       const gatewayUrlForProbe = gatewayUrlResolved
         ? gatewayUrlResolved.startsWith("ws://")
@@ -75,22 +76,33 @@ export class BootstrapStatusService {
             () => null,
           );
           clearTimeout(timeoutId);
-          gatewayReachable = !!response && response.ok;
+          gatewayTransportReachable = !!response && response.ok;
         } catch {
-          gatewayReachable = false;
+          gatewayTransportReachable = false;
         }
 
-        if (!gatewayReachable && !dataPlaneHealthy) {
+        // Only show GATEWAY_UNREACHABLE warning when both transport and data plane are unhealthy
+        if (!gatewayTransportReachable && !gatewayDataPlaneHealthy) {
           warnings.push({
             code: "GATEWAY_UNREACHABLE",
-            message: `Gateway at ${gatewayUrlResolved} is not reachable via ${gatewayUrlForProbe}`,
+            message: `Gateway transport probe failed at ${gatewayUrlForProbe} and data plane is unhealthy`,
             severity: "warning",
             remediation: "Check if the OpenClaw gateway is running and accessible.",
           });
         }
+        
+        // Show transport-specific warning when transport fails but data plane is healthy
+        if (!gatewayTransportReachable && gatewayDataPlaneHealthy) {
+          warnings.push({
+            code: "GATEWAY_TRANSPORT_DEGRADED",
+            message: `Gateway transport probe failed at ${gatewayUrlForProbe} but data plane is healthy`,
+            severity: "info",
+            remediation: "Transport layer may have issues but data operations are functioning.",
+          });
+        }
       }
 
-      operatorReadReady = !!stateDirResolved && stateDirExists && (dataPlaneHealthy || !gatewayUrlResolved || gatewayReachable);
+      operatorReadReady = !!stateDirResolved && stateDirExists && (gatewayDataPlaneHealthy || !gatewayUrlResolved || gatewayTransportReachable);
 
       return {
         mode,
@@ -98,9 +110,9 @@ export class BootstrapStatusService {
         configFileResolved,
         workspaceResolved,
         gatewayUrlResolved,
-        gatewayReachable,
+        gatewayReachable: gatewayTransportReachable,
         gatewayAuthMode,
-        dataPlaneHealthy,
+        dataPlaneHealthy: gatewayDataPlaneHealthy,
         operatorReadReady,
         warnings,
         freshness: "hot",

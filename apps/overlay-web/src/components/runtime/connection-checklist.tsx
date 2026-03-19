@@ -42,9 +42,16 @@ export function ConnectionChecklist({ status }: ConnectionChecklistProps) {
         )}
 
         <div className="checklist-item">
-          <span className="checklist-label">{t("bootstrap.gateway")}</span>
+          <span className="checklist-label">{t("runtime.gateway")}</span>
           <span className="checklist-value">
-            {getStatusIcon(status.gatewayReachable)} {status.gatewayUrlResolved || "N/A"}
+            {getStatusIcon(status.dataPlaneHealthy || status.gatewayReachable)} {status.gatewayUrlResolved || "N/A"}
+          </span>
+        </div>
+
+        <div className="checklist-item">
+          <span className="checklist-label">{t("runtime.transportProbe")}</span>
+          <span className="checklist-value">
+            <StatusBadge status={status.gatewayReachable ? "connected" : "disconnected"} />
           </span>
         </div>
 
@@ -68,21 +75,23 @@ export function ConnectionChecklist({ status }: ConnectionChecklistProps) {
         </div>
       </div>
 
-      {status.warnings.length > 0 && (
+      {status.warnings.filter(w => w.severity !== "info").length > 0 && (
         <div className="checklist-warnings">
-          {status.warnings.map((warning, index) => (
-            <div key={index} className={`alert alert-${warning.severity}`}>
-              <div className="alert-content">
-                <strong>{warning.code}: </strong>
-                {warning.message}
-                {warning.remediation && (
-                  <div className="alert-remediation">
-                    <em>{t("bootstrap.validationSteps")}: </em> {warning.remediation}
-                  </div>
-                )}
+          {status.warnings
+            .filter(warning => warning.severity !== "info") // Filter out info-level warnings
+            .map((warning, index) => (
+              <div key={index} className={`alert alert-${warning.severity}`}>
+                <div className="alert-content">
+                  <strong>{warning.code}: </strong>
+                  {warning.message}
+                  {warning.remediation && (
+                    <div className="alert-remediation">
+                      <em>{t("bootstrap.validationSteps")}: </em> {warning.remediation}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
