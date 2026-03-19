@@ -30,14 +30,27 @@ export function ConnectionChecklist({ status }: ConnectionChecklistProps) {
         {status.stateDirResolved && (
           <div className="checklist-item">
             <span className="checklist-label">{t("bootstrap.stateDir")}</span>
-            <span className="checklist-value cell-mono">{status.stateDirResolved}</span>
+            <span className="checklist-value cell-mono truncate" title={status.stateDirResolved}>
+              {status.stateDirResolved.length > 30 ? status.stateDirResolved.substring(0, 27) + '...' : status.stateDirResolved}
+            </span>
           </div>
         )}
 
         {status.configFileResolved && (
           <div className="checklist-item">
             <span className="checklist-label">{t("bootstrap.configFile")}</span>
-            <span className="checklist-value cell-mono">{status.configFileResolved}</span>
+            <span className="checklist-value cell-mono truncate" title={status.configFileResolved}>
+              {status.configFileResolved.length > 30 ? status.configFileResolved.substring(0, 27) + '...' : status.configFileResolved}
+            </span>
+          </div>
+        )}
+
+        {status.workspaceResolved && (
+          <div className="checklist-item">
+            <span className="checklist-label">{t("bootstrap.workspace")}</span>
+            <span className="checklist-value cell-mono truncate" title={status.workspaceResolved}>
+              {status.workspaceResolved.length > 30 ? status.workspaceResolved.substring(0, 27) + '...' : status.workspaceResolved}
+            </span>
           </div>
         )}
 
