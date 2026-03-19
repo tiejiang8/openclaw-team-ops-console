@@ -7,12 +7,13 @@ export interface BootstrapWarningDto {
 
 export interface BootstrapStatusDto {
   mode: "mock" | "filesystem" | "target-registry";
-  stateDirResolved?: string;
-  configFileResolved?: string;
-  workspaceResolved?: string;
-  gatewayUrlResolved?: string;
+  stateDirResolved?: string | undefined;
+  configFileResolved?: string | undefined;
+  workspaceResolved?: string | undefined;
+  gatewayUrlResolved?: string | undefined;
   gatewayReachable: boolean;
   gatewayAuthMode: "none" | "explicit" | "auto-from-openclaw-json";
+  dataPlaneHealthy: boolean;
   operatorReadReady: boolean;
   warnings: BootstrapWarningDto[];
   freshness: "hot" | "warm" | "stale";

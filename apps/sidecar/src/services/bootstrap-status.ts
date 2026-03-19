@@ -56,12 +56,22 @@ export class BootstrapStatusService {
         });
       }
 
-      if (gatewayUrlResolved) {
+      const gatewayUrlForProbe = gatewayUrlResolved
+        ? gatewayUrlResolved.startsWith("ws://")
+          ? gatewayUrlResolved.replace("ws://", "http://")
+          : gatewayUrlResolved.startsWith("wss://")
+            ? gatewayUrlResolved.replace("wss://", "https://")
+            : gatewayUrlResolved
+        : undefined;
+
+      if (gatewayUrlForProbe) {
         gatewayAuthMode = env.OPENCLAW_GATEWAY_TOKEN ? "explicit" : "auto-from-openclaw-json";
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 2000);
-          const response = await fetch(gatewayUrlResolved, { signal: controller.signal, method: "HEAD" }).catch(() => null);
+          const response = await fetch(gatewayUrlForProbe, { signal: controller.signal, method: "HEAD" }).catch(
+            () => null,
+          );
           clearTimeout(timeoutId);
           gatewayReachable = !!response && response.ok;
         } catch {
@@ -71,32 +81,42 @@ export class BootstrapStatusService {
         if (!gatewayReachable) {
           warnings.push({
             code: "GATEWAY_UNREACHABLE",
-            message: `Gateway at ${gatewayUrlResolved} is not reachable`,
+            message: `Gateway at ${gatewayUrlResolved} is not reachable via ${gatewayUrlForProbe}`,
             severity: "warning",
             remediation: "Check if the OpenClaw gateway is running and accessible.",
           });
         }
       }
 
-      operatorReadReady = !!stateDirResolved && stateDirExists && (!gatewayUrlResolved || gatewayReachable);
+      const dataPlaneHealthy = await this.adapter.isDataPlaneHealthy();
+      operatorReadReady = !!stateDirResolved && stateDirExists && (dataPlaneHealthy || !gatewayUrlResolved || gatewayReachable);
+
+      return {
+        mode,
+        stateDirResolved,
+        configFileResolved,
+        workspaceResolved,
+        gatewayUrlResolved,
+        gatewayReachable,
+        gatewayAuthMode,
+        dataPlaneHealthy,
+        operatorReadReady,
+        warnings,
+        freshness: "hot",
+        checkedAt: new Date().toISOString(),
+      };
     } else {
       // Mock mode
-      gatewayReachable = true;
-      operatorReadReady = true;
+      return {
+        mode,
+        gatewayReachable: true,
+        gatewayAuthMode: "none",
+        dataPlaneHealthy: true,
+        operatorReadReady: true,
+        warnings: [],
+        freshness: "hot",
+        checkedAt: new Date().toISOString(),
+      };
     }
-
-    return {
-      mode,
-      stateDirResolved,
-      configFileResolved,
-      workspaceResolved,
-      gatewayUrlResolved,
-      gatewayReachable,
-      gatewayAuthMode,
-      operatorReadReady,
-      warnings,
-      freshness: "hot",
-      checkedAt: new Date().toISOString(),
-    };
   }
 }

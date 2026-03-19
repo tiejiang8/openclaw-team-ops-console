@@ -109,6 +109,7 @@ export interface SidecarInventoryAdapter {
   getCronJobs(): Promise<AdapterCronJobsResult>;
   getCronJobById(id: string): Promise<AdapterCronJobResult>;
   healthCheck(): Promise<AdapterHealth>;
+  isDataPlaneHealthy(): Promise<boolean>;
   getStateDir(): string | undefined;
   getConfigFile(): string | undefined;
   getWorkspaceGlob(): string | undefined;

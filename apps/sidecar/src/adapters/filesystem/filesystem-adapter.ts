@@ -3127,6 +3127,19 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     };
   }
 
+  async isDataPlaneHealthy(): Promise<boolean> {
+    if (this.gatewayRuntimePlaneCache) {
+      const state = await this.gatewayRuntimePlaneCache.cache.getState();
+      if (state.lastSuccessAt || state.connectionState === "connected" || state.connectionState === "degraded") {
+        return true;
+      }
+    }
+
+    // Even without gateway, if we have local stats/logs, we might be "healthy" in a hybrid sense
+    const resolved = this.resolvePaths();
+    return Boolean(resolved.runtimeRoot || resolved.configFile);
+  }
+
   private async discoverCronConfig(
     resolved: ResolvedFilesystemPaths,
   ): Promise<SourceCollectionStatus> {

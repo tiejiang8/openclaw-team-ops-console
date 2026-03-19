@@ -381,6 +381,10 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
     };
   }
 
+  async isDataPlaneHealthy(): Promise<boolean> {
+    return this.scenario !== "error-upstream";
+  }
+
   getStateDir(): string | undefined {
     return undefined;
   }

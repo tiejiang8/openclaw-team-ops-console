@@ -49,6 +49,13 @@ export function ConnectionChecklist({ status }: ConnectionChecklistProps) {
         </div>
 
         <div className="checklist-item">
+          <span className="checklist-label">{t("runtime.dataReaderHealth")}</span>
+          <span className="checklist-value">
+            <StatusBadge status={status.dataPlaneHealthy ? "healthy" : "unavailable"} />
+          </span>
+        </div>
+
+        <div className="checklist-item">
           <span className="checklist-label">{t("bootstrap.ready")}</span>
           <span className="checklist-value">
             <StatusBadge status={status.operatorReadReady ? "healthy" : "unavailable"} />
