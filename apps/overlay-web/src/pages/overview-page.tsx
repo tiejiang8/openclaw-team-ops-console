@@ -18,13 +18,14 @@ import { useResource } from "../lib/use-resource.js";
 export function OverviewPage() {
   const { language, t, translateComponentType, translateFreshness, translateSignal, translateTargetSourceKind } = useI18n();
   const loadOverview = useCallback(async () => {
-    const [health, summary, targets, risksSummary, coverage, runtimeStatus] = await Promise.all([
+    const [health, summary, targets, risksSummary, coverage, runtimeStatus, recentActivity] = await Promise.all([
       overlayApi.getHealth(),
       overlayApi.getSummary(),
       overlayApi.getTargets(),
       overlayApi.getRisksSummary(),
       overlayApi.getCoverage(),
       getRuntimeStatus(),
+      overlayApi.getActivity({ limit: 5 }),
     ]);
 
     return {
@@ -34,6 +35,7 @@ export function OverviewPage() {
       risksSummary,
       coverage,
       runtimeStatus,
+      recentActivity: recentActivity.data,
     };
   }, []);
 
@@ -98,7 +100,7 @@ export function OverviewPage() {
       >
         {data ? (
           <>
-            <ConnectionChecklist status={bootstrapData?.data} />
+            <ConnectionChecklist status={bootstrapData?.data as any} />
 
             <div className={`health-banner health-${data.health.status}`}>
               <p>
@@ -140,6 +142,28 @@ export function OverviewPage() {
             </div>
 
             <RuntimeStatusCard runtime={data.runtimeStatus.data} />
+
+            <div className="panel">
+              <div className="panel-header">
+                <h3>{t("overview.recentActivityTitle")}</h3>
+                <Link to="/activity" className="inline-link">{t("common.viewDetails")} →</Link>
+              </div>
+              <div className="panel-content">
+                <div className="timeline-mini">
+                  {data.recentActivity.length === 0 ? (
+                    <p className="state-message">{t("activity.empty")}</p>
+                  ) : (
+                    data.recentActivity.map((event: any) => (
+                      <div key={event.id} className="timeline-mini-item">
+                        <span className={`signal-dot signal-${event.severity}`}></span>
+                        <span className="event-time-mini">{new Date(event.timestamp).toLocaleTimeString(language === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className="event-message-mini">{event.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="panel">
               <div className="panel-header">

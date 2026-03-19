@@ -59,7 +59,7 @@ export function ActivityPage() {
         <p>{t("activity.description")}</p>
       </header>
 
-      <PageObservability meta={data?.meta} />
+      <PageObservability meta={data?.meta as any} />
 
       <div className="filter-row filter-row-spread">
         <div className="filter-group">
@@ -91,44 +91,72 @@ export function ActivityPage() {
 
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (
-          <div className="timeline">
+          <div className="activity-timeline">
             {data.data.length === 0 ? (
               <div className="state-box">
                 <p className="state-message">{t("activity.empty")}</p>
               </div>
             ) : (
-              data.data.map((event: ActivityEventDto) => {
-                const link = getSubjectLink(event);
-                return (
-                  <div key={event.id} className="timeline-item" data-severity={event.severity}>
-                    <div className="timeline-marker"></div>
-                    <div className="timeline-content panel">
-                      <div className="event-header">
-                        <span className="event-time">{formatTimestamp(event.timestamp, language)}</span>
-                        <span className="event-type-badge" data-type={event.type}>{event.type}</span>
-                        <span className="severity-badge" data-severity={event.severity}>
-                          {getSeverityLabel(event.severity)}
-                        </span>
-                      </div>
-                      <div className="event-body">
-                        <p className="event-message">{event.message}</p>
-                        {link && (
-                          <Link to={link} className="event-link">
-                            View Details
-                          </Link>
-                        )}
-                      </div>
-                      {event.details && (
-                        <div className="event-details">
-                          {Object.entries(event.details).map(([key, value]) => (
-                            <span key={key} className="detail-pill">{key}: {String(value)}</span>
-                          ))}
-                        </div>
-                      )}
+              (() => {
+                // Group events by date
+                const groups: Record<string, ActivityEventDto[]> = {};
+                data.data.forEach((event: ActivityEventDto) => {
+                  const date = new Date(event.timestamp).toLocaleDateString(language === "zh" ? "zh-CN" : "en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+                  (groups[date] ??= []).push(event);
+                });
+
+                return Object.entries(groups).map(([date, events]) => (
+                  <div key={date} className="activity-group">
+                    <h3 className="activity-date-header">{date}</h3>
+                    <div className="timeline">
+                      {events.map((event: ActivityEventDto) => {
+                        const link = getSubjectLink(event);
+                        return (
+                          <div key={event.id} className="timeline-item" data-severity={event.severity}>
+                            <div className="timeline-marker"></div>
+                            <div className="timeline-content panel">
+                              <div className="event-header">
+                                <span className="event-time">
+                                  {new Date(event.timestamp).toLocaleTimeString(language === "zh" ? "zh-CN" : "en-US", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit"
+                                  })}
+                                </span>
+                                <span className="event-type-badge">{event.type}</span>
+                                <span className={`signal-badge signal-${event.severity}`}>
+                                  {getSeverityLabel(event.severity)}
+                                </span>
+                              </div>
+                              <div className="event-body">
+                                <p className="event-message">{event.message}</p>
+                              </div>
+                              <div className="event-footer">
+                                {event.details && (
+                                  <div className="event-details">
+                                    {Object.entries(event.details).map(([key, value]) => (
+                                      <span key={key} className="detail-pill">{key}: {String(value)}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {link && (
+                                  <Link to={link} className="btn-link">
+                                    {t("common.viewDetails")} →
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })
+                ));
+              })()
             )}
           </div>
         ) : null}

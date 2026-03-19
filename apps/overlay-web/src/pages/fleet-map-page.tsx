@@ -103,6 +103,7 @@ export function FleetMapPage() {
   const { t, translateStatus, translateNodeType } = useI18n();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"topology" | "governance">("topology");
   const svgRef = useRef<SVGSVGElement>(null);
 
   const loadFleetMap = useCallback(() => overlayApi.getFleetMap(), []);
@@ -157,17 +158,33 @@ export function FleetMapPage() {
           <h2>{t("fleet-map.title")}</h2>
           <p>{t("fleet-map.description")}</p>
         </div>
-        <div className="fleet-map-legend">
-          <span className="legend-dot legend-healthy" />
-          <span className="legend-label">{t("fleet-map.legend.healthy")}</span>
-          <span className="legend-dot legend-degraded" />
-          <span className="legend-label">{t("fleet-map.legend.degraded")}</span>
-          <span className="legend-dot legend-unavailable" />
-          <span className="legend-label">{t("fleet-map.legend.unavailable")}</span>
+        <div className="fleet-map-controls">
+          <div className="view-toggle-group">
+            <button
+              className={`view-toggle-btn ${viewMode === "topology" ? "active" : ""}`}
+              onClick={() => setViewMode("topology")}
+            >
+              {t("fleet-map.view-mode.topology")}
+            </button>
+            <button
+              className={`view-toggle-btn ${viewMode === "governance" ? "active" : ""}`}
+              onClick={() => setViewMode("governance")}
+            >
+              {t("fleet-map.view-mode.governance")}
+            </button>
+          </div>
+          <div className="fleet-map-legend">
+            <span className="legend-dot legend-healthy" />
+            <span className="legend-label">{t("fleet-map.legend.healthy")}</span>
+            <span className="legend-dot legend-degraded" />
+            <span className="legend-label">{t("fleet-map.legend.degraded")}</span>
+            <span className="legend-dot legend-unavailable" />
+            <span className="legend-label">{t("fleet-map.legend.unavailable")}</span>
+          </div>
         </div>
       </header>
 
-      <PageObservability meta={data?.meta} />
+      <PageObservability meta={data?.meta as any} />
 
       {/* ── Summary Cards ─────────────────────────────────────── */}
       {data && (
@@ -216,7 +233,7 @@ export function FleetMapPage() {
                   <div
                     key={layer}
                     className="fleet-map-layer-label"
-                    style={{ top: `${LAYER_Y[layer] + NODE_H / 2 - 10}px` }}
+                    style={{ top: `${(LAYER_Y[layer] ?? 0) + NODE_H / 2 - 10}px` }}
                   >
                     {t(`fleet-map.layer.${layer}`)}
                   </div>
@@ -298,7 +315,27 @@ export function FleetMapPage() {
                               className="node-label-fo"
                             >
                               <span className="node-label-text" title={node.label}>{node.label}</span>
-                              <span className="node-type-badge">{translateNodeType(node.nodeType)}</span>
+                              {viewMode === "governance" ? (
+                                <div className="node-governance-pills">
+                                  {node.details?.["freshness"] && (
+                                    <span className="node-gov-pill node-gov-pill--freshness" title="Freshness">
+                                      {String(node.details["freshness"])}
+                                    </span>
+                                  )}
+                                  {(Number(node.details?.["warningCount"]) > 0) && (
+                                    <span className="node-gov-pill node-gov-pill--warning" title="Warnings">
+                                      ⚠ {node.details?.["warningCount"]}
+                                    </span>
+                                  )}
+                                  {(Number(node.details?.["riskCount"]) > 0) && (
+                                    <span className="node-gov-pill node-gov-pill--risk" title="Risks">
+                                      ⚑ {node.details?.["riskCount"]}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="node-type-badge">{translateNodeType(node.nodeType)}</span>
+                              )}
                             </div>
                           </foreignObject>
 
@@ -352,12 +389,14 @@ export function FleetMapPage() {
                       <>
                         <dt>{t("fleet-map.inspector.details")}</dt>
                         <dd>
-                          {Object.entries(selectedNode.details).map(([k, v]) => (
-                            <div key={k} className="inspector-detail-row">
-                              <span className="inspector-detail-key">{k}</span>
-                              <span className="inspector-detail-val">{String(v ?? "—")}</span>
-                            </div>
-                          ))}
+                          <div className="inspector-details-grid">
+                            {Object.entries(selectedNode.details).map(([k, v]) => (
+                              <div key={k} className="inspector-detail-row">
+                                <span className="inspector-detail-key">{k}</span>
+                                <span className="inspector-detail-val">{String(v ?? "—")}</span>
+                              </div>
+                            ))}
+                          </div>
                         </dd>
                       </>
                     )}

@@ -1879,3 +1879,244 @@ th.cell-align-right {
 .inspector-empty-icon { font-size: 4rem; opacity: 0.1; margin-bottom: 1rem; }
 .inspector-empty-title { font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary); }
 .inspector-empty-hint { font-size: 0.85rem; line-height: 1.5; }
+
+/* Fleet Map Controls */
+.fleet-map-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.view-toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.view-toggle-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Node Governance Overlay */
+.node-governance-pills {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.node-gov-pill {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  pointer-events: auto;
+}
+
+.node-gov-pill--freshness {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.node-gov-pill--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.node-gov-pill--risk {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Inspector Details Grid */
+.inspector-details-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 0.5rem;
+}
+
+/* Activity Page & Timeline */
+.activity-timeline {
+  display: grid;
+  gap: 32px;
+}
+
+.activity-date-header {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.activity-date-header::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--panel-border);
+  opacity: 0.5;
+}
+
+.timeline {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding-left: 20px;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--panel-border);
+  opacity: 0.6;
+}
+
+.timeline-item {
+  position: relative;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -21px;
+  top: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--panel-border);
+  border: 2px solid #fff;
+  z-index: 1;
+}
+
+.timeline-item[data-severity="warn"] .timeline-marker { background: var(--warning); }
+.timeline-item[data-severity="error"] .timeline-marker { background: var(--danger); }
+.timeline-item[data-severity="critical"] .timeline-marker { background: var(--danger); }
+
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.event-time {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.event-type-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.event-message {
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.event-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.event-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-pill {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f8fbff;
+  color: var(--text-secondary);
+  border: 1px solid #e2e8f0;
+}
+
+.btn-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Mini Timeline (Overview) */
+.timeline-mini {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.signal-dot.signal-info { background: var(--accent); }
+.signal-dot.signal-warn { background: var(--warning); }
+.signal-dot.signal-error { background: var(--danger); }
+.signal-dot.signal-critical { background: var(--danger); border: 2px solid #fee2e2; }
+
+.event-time-mini {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  width: 60px;
+}
+
+.event-message-mini {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -18,12 +18,18 @@ export function RecommendationDetailPage() {
     const recResponse = await overlayApi.getRecommendation(id);
     const rec = recResponse.data;
     
-    // Fetch associated finding
+    // Fetch associated finding and its evidence
     const findingResponse = await overlayApi.getFinding(rec.findingId);
+    const finding = findingResponse.data;
+    
+    const evidenceResponses = await Promise.all(
+      finding.evidenceRefs.map((id) => overlayApi.getEvidence(id))
+    );
     
     return {
       recommendation: rec,
-      finding: findingResponse.data,
+      finding,
+      evidence: evidenceResponses.map(r => r.data),
       meta: recResponse.meta,
     };
   }, [id]);
@@ -85,17 +91,46 @@ export function RecommendationDetailPage() {
               )}
             </div>
 
-            <div className="panel">
-              <div className="panel-header">
-                <h3>{t("recommendationDetail.findingTitle")}</h3>
-              </div>
-              <div className="panel-content">
-                <div className="cell-title">{data.finding.summary}</div>
-                <div className="cell-subtitle">{data.finding.id}</div>
-                <div style={{ marginTop: "1rem" }}>
+            <div className="detail-grid">
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>{t("recommendationDetail.findingTitle")}</h3>
+                </div>
+                <div className="panel-content">
+                  <div className="cell-title">{data.finding.summary}</div>
+                  <div className="cell-subtitle" style={{ marginBottom: "1rem" }}>{data.finding.id}</div>
                   <Link to={`/findings/${data.finding.id}`} className="button button-outline">
-                    Go to Finding Detail
+                    View Finding Detail
                   </Link>
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>{t("findingDetail.evidenceTitle")}</h3>
+                  <p>{data.evidence.length}</p>
+                </div>
+                <div className="panel-content" style={{ padding: 0 }}>
+                  <table className="data-table density-compact">
+                    <thead>
+                      <tr>
+                        <th>{t("evidence.table.message")}</th>
+                        <th>{t("evidence.table.severity")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.evidence.map((ev) => (
+                        <tr key={ev.id}>
+                          <td>
+                            <Link to={`/evidence/${ev.id}`} className="inline-link" style={{ fontSize: "0.85rem" }}>
+                              {ev.message}
+                            </Link>
+                          </td>
+                          <td><SignalBadge value={ev.severity} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

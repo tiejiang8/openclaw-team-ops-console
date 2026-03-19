@@ -41,8 +41,8 @@ export function RecommendationsPage() {
       const finding = findingsMap.get(rec.findingId);
       return {
         ...rec,
-        targetName: finding?.targetName,
-        targetId: finding?.targetId,
+        targetName: finding?.targetName ?? "",
+        targetId: finding?.targetId ?? "",
       };
     });
 
@@ -101,7 +101,7 @@ export function RecommendationsPage() {
         <p>{t("recommendations.description")}</p>
       </header>
 
-      <PageObservability meta={data?.meta} />
+      <PageObservability meta={data?.meta as any} />
 
       <DataState
         loading={loading}

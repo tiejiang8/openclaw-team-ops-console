@@ -70,7 +70,7 @@ export function ConnectionChecklist({ status }: ConnectionChecklistProps) {
                 {warning.message}
                 {warning.remediation && (
                   <div className="alert-remediation">
-                    <em>{t("bootstrap.remediation")}: </em> {warning.remediation}
+                    <em>{t("bootstrap.validationSteps")}: </em> {warning.remediation}
                   </div>
                 )}
               </div>

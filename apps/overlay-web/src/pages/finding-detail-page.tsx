@@ -130,7 +130,7 @@ export function FindingDetailPage() {
                       {recommendation.docLink ? <p className="cell-subtitle">{recommendation.docLink}</p> : null}
                       <div style={{ marginTop: "1rem" }}>
                         <Link to={`/recommendations/${recommendation.id}`} className="button button-outline">
-                          View Remediation Detail
+                          View Recommended Checks
                         </Link>
                       </div>
                     </article>
