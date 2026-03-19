@@ -5,7 +5,9 @@ import { DataState } from "../components/data-state.js";
 import { CoverageBadge } from "../components/coverage-badge.js";
 import { MetricCard } from "../components/metric-card.js";
 import { PageObservability } from "../components/page-observability.js";
+import { useStreamRefresh } from "../components/streaming-provider.js";
 import { RuntimeStatusCard } from "../components/runtime/runtime-status-card.js";
+import { ConnectionChecklist } from "../components/runtime/connection-checklist.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
@@ -36,6 +38,9 @@ export function OverviewPage() {
   }, []);
 
   const { data, loading, error, retry } = useResource("overview", loadOverview, { refreshIntervalMs: 5000 });
+  const { data: bootstrapData, loading: bootstrapLoading, error: bootstrapError, retry: retryBootstrap } = useResource("bootstrap-status", overlayApi.getBootstrapStatus);
+
+  useStreamRefresh("bootstrap_status", retryBootstrap);
 
   const drillDownItems = useMemo(() => {
     if (!data) {
@@ -67,8 +72,8 @@ export function OverviewPage() {
 
     return {
       targetCount: data.targets.data.length,
-      warningCount: data.targets.data.reduce((count, target) => count + target.warningCount, 0),
-      highestRiskScore: Math.max(...data.targets.data.map((target) => target.riskScore), 0),
+      warningCount: data.targets.data.reduce((count: number, target: any) => count + target.warningCount, 0),
+      highestRiskScore: Math.max(...data.targets.data.map((target: any) => target.riskScore), 0),
     };
   }, [data]);
 
@@ -93,6 +98,8 @@ export function OverviewPage() {
       >
         {data ? (
           <>
+            <ConnectionChecklist status={bootstrapData?.data} />
+
             <div className={`health-banner health-${data.health.status}`}>
               <p>
                 {t("overview.healthPrefix")} <StatusBadge status={data.health.status} />{" "}
@@ -114,8 +121,8 @@ export function OverviewPage() {
                 detail={`${data.runtimeStatus.data.cron.overdue} overdue`}
               />
               <MetricCard label={t("overview.metric.targets")} value={fleetMetrics.targetCount} />
-              <MetricCard label={t("overview.metric.targetWarnings")} value={fleetMetrics.warningCount} />
-              <MetricCard label={t("overview.metric.targetRisk")} value={fleetMetrics.highestRiskScore} />
+              <MetricCard label={t("overview.metric.targetWarnings")} value={data.targets.data.reduce((count: number, target: any) => count + target.warningCount, 0)} />
+              <MetricCard label={t("overview.metric.targetRisk")} value={Math.max(...data.targets.data.map((target: any) => target.riskScore), 0)} />
               <MetricCard label={t("overview.metric.openFindings")} value={data.risksSummary.data.openFindings} />
               <MetricCard label={t("overview.metric.criticalFindings")} value={data.risksSummary.data.bySeverity.critical} />
               <MetricCard label={t("overview.metric.staleTargets")} value={data.risksSummary.data.staleTargets} />
@@ -141,7 +148,7 @@ export function OverviewPage() {
               </div>
 
               <div className="target-grid">
-                {data.targets.data.map((target) => (
+                {data.targets.data.map((target: any) => (
                   <Link key={target.id} className="target-card" to={`/targets/${target.id}`}>
                     <div className="target-card-header">
                       <div>
@@ -170,7 +177,7 @@ export function OverviewPage() {
               </div>
 
               <div className="target-grid">
-                {data.risksSummary.data.targetBreakdown.slice(0, 4).map((targetRisk) => (
+                {data.risksSummary.data.targetBreakdown.slice(0, 4).map((targetRisk: any) => (
                   <Link key={targetRisk.targetId} className="target-card" to="/risks">
                     <div className="target-card-header">
                       <div>
@@ -204,12 +211,12 @@ export function OverviewPage() {
                     <CoverageBadge coverage={data.coverage.meta.coverage} />
                   </div>
                   <div className="target-card-meta">
-                    <span>{t("coverage.metric.complete")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "complete").length}</span>
-                    <span>{t("coverage.metric.partial")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "partial").length}</span>
+                    <span>{t("coverage.metric.complete")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "complete").length}</span>
+                    <span>{t("coverage.metric.partial")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "partial").length}</span>
                   </div>
                   <div className="target-card-stats">
-                    <span>{t("coverage.metric.unavailable")}: {data.coverage.data.collections.filter((collection) => collection.coverage === "unavailable").length}</span>
-                    <span>{t("common.warnings")}: {data.coverage.data.collections.reduce((count, collection) => count + collection.warningCount, 0)}</span>
+                    <span>{t("coverage.metric.unavailable")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "unavailable").length}</span>
+                    <span>{t("common.warnings")}: {data.coverage.data.collections.reduce((count: number, collection: any) => count + collection.warningCount, 0)}</span>
                   </div>
                 </Link>
               </div>
@@ -249,7 +256,7 @@ export function OverviewPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.summary.runtimeStatuses.map((runtimeStatus) => (
+                    {data.summary.runtimeStatuses.map((runtimeStatus: any) => (
                       <tr key={runtimeStatus.componentId}>
                         <td className="cell-mono">{runtimeStatus.componentId}</td>
                         <td>{translateComponentType(runtimeStatus.componentType)}</td>

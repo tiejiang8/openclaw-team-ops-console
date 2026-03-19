@@ -5,6 +5,8 @@ import { MetricCard } from "../components/metric-card.js";
 import { NodesTable } from "../components/nodes/nodes-table.js";
 import { PageObservability } from "../components/page-observability.js";
 import { PaginationControls, TableToolbar } from "../components/table-controls.js";
+import { useStreamRefresh } from "../components/streaming-provider.js";
+import { overlayApi } from "../lib/api.js";
 import { getNodes } from "../lib/api/nodes.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useI18n } from "../lib/i18n.js";
@@ -21,7 +23,11 @@ export function NodesPage() {
     },
     defaultPageSize: 10,
   });
-  const { data, loading, error, retry } = useResource("nodes-page", getNodes, { refreshIntervalMs: 5000 });
+  const { data, loading, error, retry } = useResource("nodes", overlayApi.getNodes, {
+    refreshIntervalMs: 10000,
+  });
+
+  useStreamRefresh("node_status", retry);
   const rows = useMemo(() => data?.data ?? [], [data]);
 
   const filteredRows = useMemo(() => {

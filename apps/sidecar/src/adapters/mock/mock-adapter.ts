@@ -377,6 +377,22 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
         : {}),
     };
   }
+
+  getStateDir(): string | undefined {
+    return undefined;
+  }
+
+  getConfigFile(): string | undefined {
+    return undefined;
+  }
+
+  getWorkspaceGlob(): string | undefined {
+    return undefined;
+  }
+
+  getGatewayUrl(): string | undefined {
+    return undefined;
+  }
 }
 
 function buildMockPresence(): PresenceEntry[] {

@@ -25,6 +25,7 @@ import type {
   WorkspaceDocumentResponse,
   WorkspacesResponse,
   SessionsResponse,
+  BootstrapStatusResponse,
 } from "@openclaw-team-ops/shared";
 
 interface SidecarClientOptions {
@@ -47,6 +48,10 @@ export class SidecarClient {
 
   async getSummary(): Promise<SummaryResponse> {
     return this.request<SummaryResponse>("/sidecar/summary");
+  }
+
+  async getBootstrapStatus(): Promise<BootstrapStatusResponse> {
+    return this.request<BootstrapStatusResponse>("/bootstrap/status");
   }
 
   async getTargets(): Promise<TargetsResponse> {

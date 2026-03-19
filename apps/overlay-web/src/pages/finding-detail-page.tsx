@@ -113,7 +113,9 @@ export function FindingDetailPage() {
                     <article key={recommendation.id} className="recommendation-card">
                       <div className="recommendation-header">
                         <div>
-                          <div className="cell-title">{recommendation.title}</div>
+                          <Link to={`/recommendations/${recommendation.id}`} className="inline-link">
+                            <div className="cell-title">{recommendation.title}</div>
+                          </Link>
                           <div className="cell-subtitle">{translateRecommendationType(recommendation.type)}</div>
                         </div>
                         <SignalBadge value={recommendation.priority} />
@@ -126,6 +128,11 @@ export function FindingDetailPage() {
                         </pre>
                       ) : null}
                       {recommendation.docLink ? <p className="cell-subtitle">{recommendation.docLink}</p> : null}
+                      <div style={{ marginTop: "1rem" }}>
+                        <Link to={`/recommendations/${recommendation.id}`} className="button button-outline">
+                          View Remediation Detail
+                        </Link>
+                      </div>
                     </article>
                   ))}
                 </div>

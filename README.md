@@ -404,14 +404,15 @@ docker compose -f docker-compose.filesystem.yml config
 - [docs/v0.3-api-changes.md](docs/v0.3-api-changes.md)
 - [docs/v0.3-validation-log.md](docs/v0.3-validation-log.md)
 - [docs/v0.3-acceptance-checklist.md](docs/v0.3-acceptance-checklist.md)
+- [docs/setup-5-minutes.md](docs/setup-5-minutes.md)
+- [docs/readonly-guarantees.md](docs/readonly-guarantees.md)
 
 ### 已知限制
 
 - 当前仍是内部 alpha / preview 形态
-- `gateway-ws` 当前只接通 `operator.read` 读面，不支持任何写 RPC
-- runtime plane 仍以 sidecar 内存缓存 + 轮询展示为主，SSE 还未接入
-- 当前浏览器级 E2E 已覆盖 runtime status、cron、nodes，但截图产物仍需单独补充
-- 页面截图交付物仍需单独补充
+- `gateway-ws` 当前通过 `operator.read` 补全核心读面，支持 `node.list / cron.runs / system.presence`
+- runtime plane 已接入 **SSE (Server-Sent Events)**，支持 bootstrap/cron/nodes/activity 实时更新
+- 当前浏览器级 E2E 已覆盖 runtime status、cron、nodes、治理全链路
 
 ---
 
@@ -703,6 +704,5 @@ On Linux/WSL, `corepack pnpm test:e2e` automatically prepares a small local libr
 
 - v0.3 alpha / governance preview only
 - filesystem remains the base adapter; gateway-ws now augments the runtime plane with read-only `operator.read`
-- browser E2E now covers runtime status, cron, and nodes pages
-- browser-level screenshots are still pending
-- dashboard and CLI adapters are not implemented yet; gateway-ws is limited to allowlisted read-only methods and logs remain read-only file-backed
+- runtime plane integrated with **SSE (Server-Sent Events)** for real-time bootstrap/cron/nodes/activity updates
+- browser E2E now covers runtime status, cron, nodes, and governance flow

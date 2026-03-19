@@ -3482,6 +3482,22 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
     });
   }
 
+  getStateDir(): string | undefined {
+    return this.resolvePaths().runtimeRoot;
+  }
+
+  getConfigFile(): string | undefined {
+    return this.resolvePaths().configFile;
+  }
+
+  getWorkspaceGlob(): string | undefined {
+    return this.resolvePaths().workspaceGlob;
+  }
+
+  getGatewayUrl(): string | undefined {
+    return this.resolvePaths().gatewayUrl;
+  }
+
   private resolvePaths(): ResolvedFilesystemPaths {
     const profile = this.profileInput;
     const runtimeRootInput = this.runtimeRootInput ?? this.stateDirInput;

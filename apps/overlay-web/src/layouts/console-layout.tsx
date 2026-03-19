@@ -11,10 +11,12 @@ export function ConsoleLayout() {
     { to: "/targets", label: t("nav.targets") },
     { to: "/coverage", label: t("nav.coverage") },
     { to: "/logs", label: t("nav.logs") },
+    { to: "/activity", label: t("nav.activity") },
     { to: "/cron", label: t("nav.cron") },
     { to: "/nodes", label: t("nav.nodes") },
     { to: "/risks", label: t("nav.risks") },
     { to: "/findings", label: t("nav.findings") },
+    { to: "/recommendations", label: t("nav.recommendations") },
     { to: "/evidence", label: t("nav.evidence") },
     { to: "/agents", label: t("nav.agents") },
     { to: "/workspaces", label: t("nav.workspaces") },
@@ -22,6 +24,7 @@ export function ConsoleLayout() {
     { to: "/bindings", label: t("nav.bindings") },
     { to: "/auth-profiles", label: t("nav.authProfiles") },
     { to: "/topology", label: t("nav.topology") },
+    { to: "/fleet-map", label: t("nav.fleetMap") },
   ];
 
   return (

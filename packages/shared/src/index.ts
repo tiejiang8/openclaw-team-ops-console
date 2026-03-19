@@ -5,3 +5,7 @@ export * from "./contracts/runtime-plane.js";
 export * from "./contracts/cron.js";
 export * from "./contracts/nodes.js";
 export * from "./builders.js";
+export * from "./contracts/bootstrap.js";
+export * from "./contracts/fleet-map.js";
+export * from "./contracts/activity.js";
+export * from "./contracts/streaming.js";

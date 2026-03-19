@@ -13,6 +13,10 @@ import {
   type EvidencesResponse,
   type FindingResponse,
   type FindingsResponse,
+  type LogEntriesQuery,
+  type LogEntriesResponse,
+  type LogFilesResponse,
+  type LogSummaryResponse,
   type NodesResponse,
   type PluginsResponse,
   type PresenceResponse,
@@ -287,6 +291,18 @@ export class OverlayService {
 
   getTopology() {
     return this.sidecarClient.getTopology();
+  }
+
+  getLogFiles(): Promise<LogFilesResponse> {
+    return this.sidecarClient.getLogFiles();
+  }
+
+  getLogSummary(date?: string): Promise<LogSummaryResponse> {
+    return this.sidecarClient.getLogSummary(date);
+  }
+
+  getLogEntries(query: LogEntriesQuery = {}): Promise<LogEntriesResponse> {
+    return this.sidecarClient.getLogEntries(query);
   }
 
   async getRuntimeStatus(): Promise<RuntimeStatusResponse> {

@@ -29,6 +29,11 @@ import type {
   WorkspaceDocumentResponse,
   WorkspacesResponse,
   SessionsResponse,
+  BootstrapStatusResponse,
+  FleetMapResponseContract,
+  ActivityResponseContract,
+  RecommendationsResponseContract,
+  RecommendationResponseContract,
 } from "@openclaw-team-ops/shared";
 
 export const API_BASE_URL = (import.meta.env.VITE_OVERLAY_API_URL ?? "").replace(/\/$/, "");
@@ -62,6 +67,18 @@ export function withQuery(path: string, query: Record<string, string | undefined
 
 export const overlayApi = {
   getHealth: () => request<HealthResponse>("/health"),
+  getBootstrapStatus: () => request<BootstrapStatusResponse>("/api/bootstrap/status"),
+  getFleetMap: () => request<FleetMapResponseContract>("/api/fleet-map"),
+  getActivity: (params: { type?: string; severity?: string; limit?: number } = {}) => 
+    request<ActivityResponseContract>(withQuery("/api/activity", {
+      ...(params.type ? { type: params.type } : {}),
+      ...(params.severity ? { severity: params.severity } : {}),
+      ...(params.limit ? { limit: String(params.limit) } : {}),
+    })),
+  getRecommendations: (params: { findingId?: string } = {}) => 
+    request<RecommendationsResponseContract>(withQuery("/api/recommendations", params)),
+  getRecommendation: (id: string) => 
+    request<RecommendationResponseContract>(`/api/recommendations/${encodeURIComponent(id)}`),
   getSummary: () => request<SummaryResponse>("/api/summary"),
   getTargets: () => request<TargetsResponse>("/api/targets"),
   getTarget: (targetId: string) => request<TargetResponse>(`/api/targets/${encodeURIComponent(targetId)}`),
@@ -73,10 +90,6 @@ export const overlayApi = {
   getFindings: (query: Record<string, string | undefined> = {}) =>
     request<FindingsResponse>(withQuery("/api/findings", query)),
   getFinding: (findingId: string) => request<FindingResponse>(`/api/findings/${encodeURIComponent(findingId)}`),
-  getRecommendations: (query: Record<string, string | undefined> = {}) =>
-    request<RecommendationsResponse>(withQuery("/api/recommendations", query)),
-  getRecommendation: (recommendationId: string) =>
-    request<RecommendationResponse>(`/api/recommendations/${encodeURIComponent(recommendationId)}`),
   getRisksSummary: () => request<RisksSummaryResponse>("/api/risks/summary"),
   getCoverage: () => request<CoverageResponse>("/api/coverage"),
   getLogFiles: () => request<LogFilesResponse>("/api/logs/files"),

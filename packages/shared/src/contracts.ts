@@ -32,6 +32,15 @@ import type { ApiMeta, CoverageSummary } from "./observability.js";
 import type { CronJobDetailDto, CronJobSummaryDto } from "./contracts/cron.js";
 import type { NodeSummaryCountsDto, NodeSummaryDto } from "./contracts/nodes.js";
 import type { RuntimeStatusDto } from "./contracts/runtime-plane.js";
+import type { BootstrapStatusDto, BootstrapStatusResponse } from "./contracts/bootstrap.js";
+import type { FleetMapDto, FleetMapResponse } from "./contracts/fleet-map.js";
+import type { ActivityEventDto, ActivityResponse } from "./contracts/activity.js";
+import type { StreamingEventDto } from "./contracts/streaming.js";
+
+export * from "./contracts/bootstrap.js";
+export * from "./contracts/fleet-map.js";
+export * from "./contracts/activity.js";
+export * from "./contracts/streaming.js";
 
 export interface ResponseMeta extends ApiMeta {}
 
@@ -123,3 +132,7 @@ export type ToolsResponse = ListResponse<Tool>;
 export type PluginsResponse = ListResponse<Plugin>;
 export type CronJobsResponse = ListResponse<CronJobSummaryDto>;
 export interface CronJobResponse extends ItemResponse<CronJobDetailDto> {}
+export type FleetMapResponseContract = FleetMapResponse;
+export type ActivityResponseContract = ActivityResponse;
+export type RecommendationsResponseContract = RecommendationsResponse;
+export type RecommendationResponseContract = RecommendationResponse;
