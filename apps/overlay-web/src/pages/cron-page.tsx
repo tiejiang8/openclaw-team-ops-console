@@ -23,22 +23,7 @@ export function CronPage() {
     defaultPageSize: 10,
   });
 
-  const loadCronJobs = useMemo(() => {
-    return () => getCronJobs({
-      q: tableState.search,
-      status: tableState.filters.status,
-      page: String(tableState.page),
-      pageSize: String(tableState.pageSize),
-      sortBy: tableState.sortBy,
-      sortDirection: tableState.sortDirection,
-    });
-  }, [tableState.search, tableState.filters.status, tableState.page, tableState.pageSize, tableState.sortBy, tableState.sortDirection]);
-
-  const { data, loading, error, retry } = useResource(
-    `cron-${tableState.search}-${tableState.filters.status}-${String(tableState.page)}-${String(tableState.pageSize)}-${tableState.sortBy}-${tableState.sortDirection}`,
-    loadCronJobs,
-    { refreshIntervalMs: 10000 }
-  );
+  const { data, loading, error, retry } = useResource("cron-page", getCronJobs, { refreshIntervalMs: 10000 });
 
   useStreamRefresh("cron_job", retry);
 
