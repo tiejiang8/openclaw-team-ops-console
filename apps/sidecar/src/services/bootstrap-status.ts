@@ -56,6 +56,8 @@ export class BootstrapStatusService {
         });
       }
 
+      const dataPlaneHealthy = await this.adapter.isDataPlaneHealthy();
+
       const gatewayUrlForProbe = gatewayUrlResolved
         ? gatewayUrlResolved.startsWith("ws://")
           ? gatewayUrlResolved.replace("ws://", "http://")
@@ -78,7 +80,7 @@ export class BootstrapStatusService {
           gatewayReachable = false;
         }
 
-        if (!gatewayReachable) {
+        if (!gatewayReachable && !dataPlaneHealthy) {
           warnings.push({
             code: "GATEWAY_UNREACHABLE",
             message: `Gateway at ${gatewayUrlResolved} is not reachable via ${gatewayUrlForProbe}`,
@@ -88,7 +90,6 @@ export class BootstrapStatusService {
         }
       }
 
-      const dataPlaneHealthy = await this.adapter.isDataPlaneHealthy();
       operatorReadReady = !!stateDirResolved && stateDirExists && (dataPlaneHealthy || !gatewayUrlResolved || gatewayReachable);
 
       return {

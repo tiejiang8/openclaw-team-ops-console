@@ -111,5 +111,6 @@ describe("BootstrapStatusService", () => {
     expect(status.gatewayReachable).toBe(false);
     expect(status.dataPlaneHealthy).toBe(true);
     expect(status.operatorReadReady).toBe(true);
+    expect(status.warnings.some((w: any) => w.code === "GATEWAY_UNREACHABLE")).toBe(false);
   });
 });

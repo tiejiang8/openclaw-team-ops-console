@@ -137,7 +137,7 @@ export function OverviewPage() {
               <MetricCard 
                 label={t("runtime.gateway")} 
                 value={data.runtimeStatus.data.gateway.dataReaderHealth === "healthy" || data.runtimeStatus.data.gateway.dataReaderHealth === "partial" 
-                  ? t("common.status.ok") 
+                  ? t("status.ok") 
                   : translateStatus(data.runtimeStatus.data.gateway.connectionState)} 
               />
               <MetricCard
