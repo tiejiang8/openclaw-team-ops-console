@@ -29,8 +29,12 @@ export function RuntimeStatusCard({ runtime }: { runtime: RuntimeStatusDto }) {
           <strong>{translateRuntimeMode(runtime.sourceMode, t)}</strong>
         </div>
         <div className="runtime-card-item">
-          <span className="runtime-card-label">{t("runtime.gateway")}</span>
-          <strong>{translateStatus(runtime.gateway.connectionState)}</strong>
+          <span className="runtime-card-label">{t("runtime.transportProbe")}</span>
+          <StatusBadge status={runtime.gateway.transportProbe === "connected" ? "healthy" : (runtime.gateway.transportProbe === "degraded" ? "degraded" : "offline")} />
+        </div>
+        <div className="runtime-card-item">
+          <span className="runtime-card-label">{t("runtime.dataReaderHealth")}</span>
+          <StatusBadge status={runtime.gateway.dataReaderHealth} />
         </div>
         <div className="runtime-card-item">
           <span className="runtime-card-label">{t("runtime.gatewayConfigured")}</span>
@@ -48,7 +52,15 @@ export function RuntimeStatusCard({ runtime }: { runtime: RuntimeStatusDto }) {
           <span className="runtime-card-label">{t("runtime.cron")}</span>
           <strong>{t("runtime.cronSummary", { total: runtime.cron.total, overdue: runtime.cron.overdue })}</strong>
         </div>
-        <div className="runtime-card-item runtime-card-item-wide">
+        <div className="runtime-card-item">
+          <span className="runtime-card-label">{t("runtime.lastSuccess")}</span>
+          <strong>{runtime.gateway.lastSuccessAt ? formatTimestamp(runtime.gateway.lastSuccessAt, language) : "-"}</strong>
+        </div>
+        <div className="runtime-card-item">
+          <span className="runtime-card-label">{t("runtime.lastFailure")}</span>
+          <strong>{runtime.gateway.lastFailureAt ? formatTimestamp(runtime.gateway.lastFailureAt, language) : "-"}</strong>
+        </div>
+        <div className="runtime-card-item">
           <span className="runtime-card-label">{t("runtime.lastSeen")}</span>
           <strong>{formatTimestamp(runtime.gateway.lastSeenAt ?? runtime.snapshotAt, language)}</strong>
         </div>

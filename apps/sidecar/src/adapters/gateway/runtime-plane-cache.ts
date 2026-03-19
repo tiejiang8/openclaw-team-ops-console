@@ -1,4 +1,4 @@
-import type { CronJobDetailDto, CronJobSummaryDto, NodeSummaryDto, PresenceEntry, RuntimeConnectionState } from "@openclaw-team-ops/shared";
+import type { CronJobDetailDto, CronJobSummaryDto, NodeSummaryDto, PresenceEntry, RuntimeConnectionState, RuntimeOverallState } from "@openclaw-team-ops/shared";
 
 import { fetchGatewayCronJobDetail, fetchGatewayCronJobs } from "./fetch-cron.js";
 import { fetchGatewayNodes } from "./fetch-nodes.js";
@@ -10,9 +10,13 @@ export interface GatewayRuntimePlaneState {
   configured: boolean;
   authResolved: boolean;
   connectionState: RuntimeConnectionState;
+  transportProbe: RuntimeConnectionState;
+  dataReaderHealth: RuntimeOverallState;
   rpcHealthy?: boolean;
   identity?: GatewayIdentityProbe;
   lastSeenAt?: string;
+  lastSuccessAt?: string | undefined;
+  lastFailureAt?: string | undefined;
   warnings: string[];
   snapshotAt: string;
   presence: PresenceEntry[];
@@ -159,9 +163,13 @@ export class GatewayRuntimePlaneCache {
         configured: true,
         authResolved: true,
         connectionState,
+        transportProbe: connectionState,
+        dataReaderHealth: determineDataReaderHealth([presenceResult, nodesResult, cronResult]),
         rpcHealthy: statusResult.status === "fulfilled" ? statusResult.value.rpcHealthy : connectionState === "connected",
         ...(identityResult.status === "fulfilled" ? { identity: identityResult.value } : {}),
         lastSeenAt: snapshotAt,
+        lastSuccessAt: snapshotAt,
+        lastFailureAt: this.snapshot?.lastFailureAt,
         warnings,
         snapshotAt,
         presence: presenceResult.status === "fulfilled" ? presenceResult.value : [],
@@ -182,6 +190,10 @@ export class GatewayRuntimePlaneCache {
       const snapshot: GatewayRuntimePlaneState = {
         ...base,
         connectionState,
+        transportProbe: connectionState,
+        dataReaderHealth: "unavailable",
+        lastSuccessAt: this.snapshot?.lastSuccessAt,
+        lastFailureAt: new Date().toISOString(),
         warnings: [message],
         snapshotAt: new Date().toISOString(),
       };
@@ -229,6 +241,8 @@ export class GatewayRuntimePlaneCache {
       configured: Boolean(this.url),
       authResolved: Boolean(this.authToken),
       connectionState,
+      transportProbe: connectionState,
+      dataReaderHealth: "unavailable",
       warnings: [],
       snapshotAt: new Date().toISOString(),
       presence: [],
@@ -256,6 +270,13 @@ function determineConnectionState(
 
 function extractRejectedWarning(result: PromiseSettledResult<unknown>): string[] {
   return result.status === "rejected" ? [toErrorMessage(result.reason)] : [];
+}
+
+function determineDataReaderHealth(results: Array<PromiseSettledResult<unknown>>): RuntimeOverallState {
+  const fulfilledCount = results.filter((r) => r.status === "fulfilled").length;
+  if (fulfilledCount === results.length) return "healthy";
+  if (fulfilledCount > 0) return "partial";
+  return "unavailable";
 }
 
 function normalizeInput(value: unknown): string | undefined {

@@ -259,6 +259,9 @@ export class MockOpenClawAdapter implements SidecarInventoryAdapter {
         configured: false,
         authResolved: false,
         connectionState: "not-configured",
+        transportProbe: "not-configured",
+        dataReaderHealth: "healthy",
+        lastSuccessAt: now,
         warnings: [],
       },
       openclaw: {

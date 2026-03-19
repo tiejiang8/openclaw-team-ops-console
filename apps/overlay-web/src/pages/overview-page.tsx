@@ -16,30 +16,53 @@ import { getRuntimeStatus } from "../lib/api/runtime.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
-  const { language, t, translateComponentType, translateFreshness, translateSignal, translateTargetSourceKind } = useI18n();
-  const loadOverview = useCallback(async () => {
-    const [health, summary, targets, risksSummary, coverage, runtimeStatus, recentActivity] = await Promise.all([
-      overlayApi.getHealth(),
+  const { language, t, translateComponentType, translateFreshness, translateSignal, translateStatus, translateTargetSourceKind } = useI18n();
+  
+  const loadStatic = useCallback(async () => {
+    const [summary, targets, coverage] = await Promise.all([
       overlayApi.getSummary(),
       overlayApi.getTargets(),
-      overlayApi.getRisksSummary(),
       overlayApi.getCoverage(),
-      getRuntimeStatus(),
-      overlayApi.getActivity({ limit: 5 }),
     ]);
-
-    return {
-      health,
-      summary,
-      targets,
-      risksSummary,
-      coverage,
-      runtimeStatus,
-      recentActivity: recentActivity.data,
-    };
+    return { summary, targets, coverage };
   }, []);
 
-  const { data, loading, error, retry } = useResource("overview", loadOverview, { refreshIntervalMs: 5000 });
+  const loadRuntime = useCallback(async () => {
+    const [health, runtimeStatus, risksSummary] = await Promise.all([
+      overlayApi.getHealth(),
+      getRuntimeStatus(),
+      overlayApi.getRisksSummary(),
+    ]);
+    return { health, runtimeStatus, risksSummary };
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    const result = await overlayApi.getActivity({ limit: 5 });
+    return result.data;
+  }, []);
+
+  const staticRes = useResource("overview-static", loadStatic, { refreshIntervalMs: 30000 });
+  const runtimeRes = useResource("overview-runtime", loadRuntime, { refreshIntervalMs: 10000 });
+  const activityRes = useResource("overview-activity", loadActivity, { refreshIntervalMs: 15000 });
+
+  const loading = staticRes.loading || runtimeRes.loading;
+  const error = staticRes.error || runtimeRes.error || activityRes.error;
+  
+  const data = useMemo(() => {
+    if (!staticRes.data || !runtimeRes.data) return null;
+    return {
+      ...staticRes.data,
+      ...runtimeRes.data,
+      recentActivity: activityRes.data ?? [],
+    };
+  }, [staticRes.data, runtimeRes.data, activityRes.data]);
+
+  const retry = useCallback(() => {
+    staticRes.retry();
+    runtimeRes.retry();
+    activityRes.retry();
+  }, [staticRes, runtimeRes, activityRes]);
+
   const { data: bootstrapData, loading: bootstrapLoading, error: bootstrapError, retry: retryBootstrap } = useResource("bootstrap-status", overlayApi.getBootstrapStatus);
 
   useStreamRefresh("bootstrap_status", retryBootstrap);
@@ -111,7 +134,12 @@ export function OverviewPage() {
             </div>
 
             <div className="metrics-grid">
-              <MetricCard label={t("runtime.gateway")} value={data.runtimeStatus.data.gateway.connectionState} />
+              <MetricCard 
+                label={t("runtime.gateway")} 
+                value={data.runtimeStatus.data.gateway.dataReaderHealth === "healthy" || data.runtimeStatus.data.gateway.dataReaderHealth === "partial" 
+                  ? t("common.status.ok") 
+                  : translateStatus(data.runtimeStatus.data.gateway.connectionState)} 
+              />
               <MetricCard
                 label={t("runtime.nodes")}
                 value={data.runtimeStatus.data.nodes.connected}

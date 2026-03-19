@@ -28,12 +28,16 @@ export interface RuntimeStatusDto {
     authResolved: boolean;
     url?: string;
     connectionState: RuntimeConnectionState;
+    transportProbe: RuntimeConnectionState;
+    dataReaderHealth: RuntimeOverallState;
     rpcHealthy?: boolean;
     identity?: {
       name?: string;
       version?: string;
     };
     lastSeenAt?: string;
+    lastSuccessAt?: string | undefined;
+    lastFailureAt?: string | undefined;
     warnings: string[];
   };
   openclaw: {

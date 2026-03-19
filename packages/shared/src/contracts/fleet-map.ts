@@ -9,7 +9,7 @@ export interface FleetMapNode {
   status: string;
   workspaceId?: string;
   targetId?: string;
-  severity?: FindingSeverity | SnapshotWarningSeverity;
+  severity?: FindingSeverity | SnapshotWarningSeverity | undefined;
   details?: Record<string, string | number | boolean | null>;
 }
 
@@ -26,6 +26,7 @@ export interface FleetMapDto {
   nodes: FleetMapNode[];
   edges: FleetMapEdge[];
 }
+
 
 export interface FleetMapResponse {
   data: FleetMapDto;

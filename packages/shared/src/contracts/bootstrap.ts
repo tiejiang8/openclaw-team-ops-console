@@ -24,5 +24,6 @@ export interface BootstrapStatusResponse {
   meta: {
     generatedAt: string;
     readOnly: boolean;
+    source?: string;
   };
 }

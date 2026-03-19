@@ -5,6 +5,7 @@ import { PageObservability } from "../components/page-observability.js";
 import { overlayApi } from "../lib/api.js";
 import { useI18n } from "../lib/i18n.js";
 import { useResource } from "../lib/use-resource.js";
+import { StatusBadge } from "../components/status-badge.js";
 import type { FleetMapNode, FleetMapEdge } from "@openclaw-team-ops/shared";
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -15,7 +16,6 @@ const LAYER_Y: Record<string, number> = {
   target: 60,
   workspace: 60 + LAYER_GAP,
   agent: 60 + LAYER_GAP * 2,
-  session: 60 + LAYER_GAP * 3,
 };
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -69,9 +69,11 @@ interface PositionedNode extends FleetMapNode {
 
 function computeLayout(nodes: FleetMapNode[]): PositionedNode[] {
   const byLayer: Record<string, FleetMapNode[]> = {};
+  const visibleTypes = ["target", "workspace", "agent"];
+  
   for (const n of nodes) {
-    const layer = ["target", "workspace", "agent", "session"].includes(n.nodeType) ? n.nodeType : "agent";
-    (byLayer[layer] ??= []).push(n);
+    if (!visibleTypes.includes(n.nodeType)) continue;
+    (byLayer[n.nodeType] ??= []).push(n);
   }
   const placed: PositionedNode[] = [];
   for (const [layer, layerNodes] of Object.entries(byLayer)) {
@@ -114,7 +116,36 @@ export function FleetMapPage() {
     return computeLayout(data.data.nodes);
   }, [data]);
 
-  const edges = useMemo<FleetMapEdge[]>(() => data?.data.edges ?? [], [data]);
+  // Auto-selection logic
+  useMemo(() => {
+    if (!selectedId && positioned.length > 0) {
+      // Find first anomalous node
+      const anomalous = positioned.find(n => n.health === "unavailable" || n.health === "degraded");
+      // Or first target
+      const target = positioned.find(n => n.nodeType === "target");
+      setSelectedId(anomalous?.id ?? target?.id ?? positioned[0]?.id ?? null);
+    }
+  }, [positioned, selectedId]);
+
+  const associatedNodes = useMemo(() => {
+    if (!selectedId || !data) return [];
+    const connectedIds = new Set(
+      data.data.edges
+        .filter(e => e.fromId === selectedId || e.toId === selectedId)
+        .map(e => e.fromId === selectedId ? e.toId : e.fromId)
+    );
+    return data.data.nodes.filter(n => connectedIds.has(n.id) && !["target", "workspace", "agent"].includes(n.nodeType));
+  }, [selectedId, data]);
+
+  const visibleNodeIds = useMemo(() => new Set(positioned.map(n => n.id)), [positioned]);
+
+  const edges = useMemo<FleetMapEdge[]>(() => {
+    if (!data) return [];
+    return data.data.edges.filter(e => 
+      (visibleNodeIds.has(e.fromId) && visibleNodeIds.has(e.toId)) ||
+      (selectedId && (e.fromId === selectedId || e.toId === selectedId))
+    );
+  }, [data, visibleNodeIds, selectedId]);
 
   const posMap = useMemo(() => {
     const m: Record<string, PositionedNode> = {};
@@ -229,7 +260,7 @@ export function FleetMapPage() {
             <div className="fleet-map-canvas-wrap panel">
               {/* Layer labels */}
               <div className="fleet-map-layers" style={{ height: `${svgHeight}px` }}>
-                {(["target", "workspace", "agent", "session"] as const).map((layer) => (
+                {(["target", "workspace", "agent"] as const).map((layer) => (
                   <div
                     key={layer}
                     className="fleet-map-layer-label"
@@ -261,11 +292,12 @@ export function FleetMapPage() {
                       const from = posMap[edge.fromId];
                       const to = posMap[edge.toId];
                       if (!from || !to) return null;
+                      const isHighlighted = selectedId === edge.fromId || selectedId === edge.toId;
                       return (
                         <path
                           key={`edge-${i}`}
                           d={edgePath(from, to)}
-                          className="fleet-edge"
+                          className={`fleet-edge${isHighlighted ? " fleet-edge--highlight" : ""}`}
                           markerEnd="url(#arrow)"
                         />
                       );
@@ -394,6 +426,23 @@ export function FleetMapPage() {
                               <div key={k} className="inspector-detail-row">
                                 <span className="inspector-detail-key">{k}</span>
                                 <span className="inspector-detail-val">{String(v ?? "—")}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </dd>
+                      </>
+                    )}
+
+                    {associatedNodes.length > 0 && (
+                      <>
+                        <dt>{t("fleet-map.inspector.associated")}</dt>
+                        <dd>
+                          <div className="inspector-associated-list">
+                            {associatedNodes.map(assoc => (
+                              <div key={assoc.id} className="inspector-associated-item">
+                                <span className="assoc-icon">{getIcon(assoc.nodeType)}</span>
+                                <span className="assoc-label" title={assoc.label}>{assoc.label}</span>
+                                <StatusBadge status={getHealth(assoc.status)} />
                               </div>
                             ))}
                           </div>

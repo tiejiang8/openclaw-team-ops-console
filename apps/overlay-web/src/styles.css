@@ -2120,3 +2120,57 @@ th.cell-align-right {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Fleet Map Professionalization */
+.inspector-associated-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 0.5rem;
+}
+
+.inspector-associated-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.inspector-associated-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.assoc-icon {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  width: 24px;
+  text-align: center;
+}
+
+.assoc-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.fleet-edge {
+  stroke: var(--panel-border);
+  stroke-width: 1.5;
+  fill: none;
+  opacity: 0.3;
+  transition: all 0.3s ease;
+}
+
+.fleet-edge--highlight {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  opacity: 1;
+  filter: drop-shadow(0 0 2px var(--accent-light));
+}

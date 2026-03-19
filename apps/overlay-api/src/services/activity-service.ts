@@ -12,9 +12,9 @@ import { SidecarClient } from "../clients/sidecar-client.js";
 import { buildApiMeta } from "./api-meta.js";
 
 export interface ActivityQuery {
-  type?: ActivityEventType;
-  severity?: ActivityEventSeverity;
-  limit?: number;
+  type?: ActivityEventType | undefined;
+  severity?: ActivityEventSeverity | undefined;
+  limit?: number | undefined;
 }
 
 export class ActivityService {
@@ -100,7 +100,7 @@ export class ActivityService {
           type: "log",
           severity: log.level === "error" ? "error" : "warn",
           message: log.message,
-          subjectId: log.refs?.sessionId || log.refs?.jobId,
+          subjectId: log.refs?.sessionId || log.refs?.jobId || "system",
           subjectType: log.refs?.sessionId ? "session" : log.refs?.jobId ? "cron-job" : "system",
           details: {
             subsystem: log.subsystem || "unknown",

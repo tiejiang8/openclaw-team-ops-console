@@ -23,7 +23,12 @@ export function useResource<T>(key: string, loader: () => Promise<T>, options: U
     loader()
       .then((result) => {
         if (!cancelled) {
-          setData(result);
+          setData((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(result)) {
+              return prev as T;
+            }
+            return result;
+          });
         }
       })
       .catch((loadError) => {
@@ -49,7 +54,9 @@ export function useResource<T>(key: string, loader: () => Promise<T>, options: U
     }
 
     const interval = window.setInterval(() => {
-      setAttempt((value) => value + 1);
+      if (document.visibilityState === "visible") {
+        setAttempt((value) => value + 1);
+      }
     }, options.refreshIntervalMs);
 
     return () => {

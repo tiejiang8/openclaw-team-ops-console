@@ -9,7 +9,11 @@ export class BootstrapService {
     const response = await this.sidecarClient.getBootstrapStatus();
     return {
       data: response.data,
-      meta: buildApiMeta(response.meta),
+      meta: {
+        generatedAt: response.meta.generatedAt,
+        readOnly: response.meta.readOnly,
+        source: (response.meta as any).source ?? "mixed",
+      } as any,
     };
   }
 }

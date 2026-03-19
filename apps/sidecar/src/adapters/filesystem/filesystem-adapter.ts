@@ -1354,7 +1354,7 @@ function deriveOpenClawOverallState(input: {
   }
 
   if (detectedCount === 3) {
-    return input.gatewayState === "disconnected" ? "degraded" : "healthy";
+    return "healthy";
   }
 
   return detectedCount >= 2 ? "partial" : "degraded";
@@ -3010,9 +3010,13 @@ export class FilesystemOpenClawAdapter implements SidecarInventoryAdapter {
         authResolved: runtimePlane.state.authResolved,
         ...(resolved.gatewayUrl ? { url: resolved.gatewayUrl } : {}),
         connectionState: runtimePlane.state.connectionState,
+        transportProbe: runtimePlane.state.transportProbe,
+        dataReaderHealth: runtimePlane.state.dataReaderHealth,
         ...(typeof runtimePlane.state.rpcHealthy === "boolean" ? { rpcHealthy: runtimePlane.state.rpcHealthy } : {}),
         ...(runtimePlane.state.identity ? { identity: runtimePlane.state.identity } : {}),
         ...(runtimePlane.state.lastSeenAt ? { lastSeenAt: runtimePlane.state.lastSeenAt } : {}),
+        ...(runtimePlane.state.lastSuccessAt ? { lastSuccessAt: runtimePlane.state.lastSuccessAt } : {}),
+        ...(runtimePlane.state.lastFailureAt ? { lastFailureAt: runtimePlane.state.lastFailureAt } : {}),
         warnings: runtimePlane.state.warnings,
       },
       openclaw: {

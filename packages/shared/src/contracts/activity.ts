@@ -7,8 +7,8 @@ export interface ActivityEventDto {
   type: ActivityEventType;
   severity: ActivityEventSeverity;
   message: string;
-  subjectId?: string;
-  subjectType?: string;
+  subjectId?: string | undefined;
+  subjectType?: string | undefined;
   targetId?: string;
   details?: Record<string, string | number | boolean | null>;
 }
