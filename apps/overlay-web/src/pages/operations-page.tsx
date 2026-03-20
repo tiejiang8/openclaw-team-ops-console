@@ -9,15 +9,22 @@ import { OpsHealthStrip } from "../components/operations/ops-health-strip.js";
 import { PageObservability } from "../components/page-observability.js";
 import { DrilldownLink } from "../components/evidence/drilldown-link.js";
 import { overlayApi } from "../lib/api.js";
-import { useResource } from "../lib/use-resource.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
+import { useResource } from "../lib/use-resource.js";
 
 export function OperationsPage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const { data, loading, error, retry } = useResource(
     "dashboard-operations",
     overlayApi.getDashboardOperations,
-    { refreshIntervalMs: 15000 },
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+      preserveDataOnError: true,
+      errorBackoffMs: 60_000,
+    },
   );
 
   return (
@@ -29,7 +36,13 @@ export function OperationsPage() {
 
       <PageObservability meta={data?.meta} />
 
-      <DataState loading={loading} error={error} onRetry={retry}>
+      <DataState
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        preserveChildrenOnError={Boolean(data)}
+        staleWarning={error && data ? t("refresh.lastDataRetained") : null}
+      >
         {data ? (
           <>
             <OpsHealthStrip dashboard={data.data} />
@@ -64,8 +77,8 @@ export function OperationsPage() {
             <article className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Next drilldowns</h3>
-                  <p>Open the most relevant read-only workbench before you lose context.</p>
+                  <h3>{t("operations.nextDrilldownsTitle")}</h3>
+                  <p>{t("operations.nextDrilldownsDescription")}</p>
                 </div>
               </div>
               <div className="dashboard-card-actions">

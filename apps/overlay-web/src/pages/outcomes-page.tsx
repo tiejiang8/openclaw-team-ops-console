@@ -9,14 +9,19 @@ import { MetricCard } from "../components/metric-card.js";
 import { PageObservability } from "../components/page-observability.js";
 import { overlayApi } from "../lib/api.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OutcomesPage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const { data, loading, error, retry } = useResource(
     "dashboard-outcomes",
     overlayApi.getDashboardOutcomes,
-    { refreshIntervalMs: 20000 },
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+    },
   );
 
   return (
@@ -32,10 +37,10 @@ export function OutcomesPage() {
         {data ? (
           <>
             <section className="dashboard-health-strip">
-              <MetricCard label="Active teams" value={data.data.activeTeams} />
-              <MetricCard label="Repeated usage teams" value={data.data.repeatedUsageTeams} />
-              <MetricCard label="High-intensity workspaces" value={data.data.highIntensityWorkspaces} />
-              <MetricCard label="Biggest blocker" value={data.data.biggestBlocker} />
+              <MetricCard label={t("outcomes.metric.activeTeams")} value={data.data.activeTeams} />
+              <MetricCard label={t("outcomes.metric.repeatedUsageTeams")} value={data.data.repeatedUsageTeams} />
+              <MetricCard label={t("outcomes.metric.highIntensityWorkspaces")} value={data.data.highIntensityWorkspaces} />
+              <MetricCard label={t("outcomes.metric.biggestBlocker")} value={data.data.biggestBlocker} />
             </section>
 
             <ExecutiveSummaryCard
@@ -49,8 +54,8 @@ export function OutcomesPage() {
               <article className="panel">
                 <div className="panel-header">
                   <div>
-                    <h3>Value signals</h3>
-                    <p>Signals that help answer whether expansion is compounding or stalling.</p>
+                    <h3>{t("outcomes.valueSignalsTitle")}</h3>
+                    <p>{t("outcomes.valueSignalsDescription")}</p>
                   </div>
                 </div>
                 <div className="dashboard-grid dashboard-grid-1">
@@ -64,8 +69,8 @@ export function OutcomesPage() {
             <article className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Promotion blockers</h3>
-                  <p>What to clear first before pushing wider rollout.</p>
+                  <h3>{t("outcomes.promotionBlockersTitle")}</h3>
+                  <p>{t("outcomes.promotionBlockersDescription")}</p>
                 </div>
               </div>
               <div className="chip-row">
@@ -80,8 +85,8 @@ export function OutcomesPage() {
             <article className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Next drilldowns</h3>
-                  <p>Review adoption, governance, and outcome pages side by side before pushing broader rollout.</p>
+                  <h3>{t("outcomes.nextDrilldownsTitle")}</h3>
+                  <p>{t("outcomes.nextDrilldownsDescription")}</p>
                 </div>
               </div>
               <div className="dashboard-card-actions">

@@ -9,11 +9,13 @@ import { PaginationControls, TableToolbar } from "../components/table-controls.j
 import { getCronJobs } from "../lib/api/cron.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 import { useTableQueryState } from "../lib/table-state.js";
 
 export function CronPage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const tableState = useTableQueryState({
     defaultSortBy: "nextRunAt",
     defaultSortDirection: "asc",
@@ -23,9 +25,12 @@ export function CronPage() {
     defaultPageSize: 10,
   });
 
-  const { data, loading, error, retry } = useResource("cron-page", getCronJobs, { refreshIntervalMs: 10000 });
+  const { data, loading, error, retry } = useResource("cron-page", getCronJobs, {
+    refreshIntervalMs: intervalMs,
+    autoRefreshEnabled,
+  });
 
-  useStreamRefresh("cron_job", retry);
+  useStreamRefresh("cron_job", retry, { enabled: autoRefreshEnabled, throttleMs: intervalMs || 30_000 });
 
   const rows = useMemo(() => data?.data ?? [], [data]);
   const filteredRows = useMemo(() => {

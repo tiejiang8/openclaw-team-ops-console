@@ -10,11 +10,13 @@ import { overlayApi } from "../lib/api.js";
 import { getNodes } from "../lib/api/nodes.js";
 import { includesSearch, paginateRows, sortRows } from "../lib/table-helpers.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 import { useTableQueryState } from "../lib/table-state.js";
 
 export function NodesPage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const tableState = useTableQueryState({
     defaultSortBy: "lastConnectAt",
     defaultSortDirection: "desc",
@@ -24,10 +26,11 @@ export function NodesPage() {
     defaultPageSize: 10,
   });
   const { data, loading, error, retry } = useResource("nodes", overlayApi.getNodes, {
-    refreshIntervalMs: 10000,
+    refreshIntervalMs: intervalMs,
+    autoRefreshEnabled,
   });
 
-  useStreamRefresh("node_status", retry);
+  useStreamRefresh("node_status", retry, { enabled: autoRefreshEnabled, throttleMs: intervalMs || 30_000 });
   const rows = useMemo(() => data?.data ?? [], [data]);
 
   const filteredRows = useMemo(() => {

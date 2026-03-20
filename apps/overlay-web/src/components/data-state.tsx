@@ -12,6 +12,8 @@ interface DataStateProps {
   emptyTitle?: string | undefined;
   emptyMessage?: string | undefined;
   onRetry?: (() => void) | undefined;
+  preserveChildrenOnError?: boolean | undefined;
+  staleWarning?: string | null | undefined;
 }
 
 export function DataState({
@@ -24,6 +26,8 @@ export function DataState({
   emptyTitle = "No data found",
   emptyMessage = "Try adjusting filters or search criteria.",
   onRetry,
+  preserveChildrenOnError = false,
+  staleWarning,
 }: DataStateProps) {
   const { t } = useI18n();
 
@@ -37,6 +41,23 @@ export function DataState({
   }
 
   if (error) {
+    if (preserveChildrenOnError) {
+      return (
+        <>
+          <div className="state-box state-box-warning">
+            <p className="state-title">{t("state.staleTitle")}</p>
+            <p className="state-message">{staleWarning ?? t("state.staleMessage")}</p>
+            {onRetry ? (
+              <button type="button" className="state-retry-button" onClick={onRetry}>
+                {t("state.retry")}
+              </button>
+            ) : null}
+          </div>
+          {children}
+        </>
+      );
+    }
+
     return (
       <div className="state-box state-box-error">
         <p className="state-title">{errorTitle === "Request failed" ? t("state.errorTitle") : errorTitle}</p>

@@ -3,6 +3,7 @@ import type { RuntimeStatusDto } from "@openclaw-team-ops/shared";
 import { getRuntimeStatus } from "../../lib/api/runtime.js";
 import { formatTimestamp } from "../../lib/format.js";
 import { useI18n } from "../../lib/i18n.js";
+import { useRefreshPreferences } from "../../lib/refresh-preferences.js";
 import { useResource } from "../../lib/use-resource.js";
 
 function translateRuntimeMode(mode: RuntimeStatusDto["sourceMode"], t: (key: string, params?: Record<string, string | number>) => string) {
@@ -34,7 +35,11 @@ function buildChips(
 
 export function RuntimeStatusBar() {
   const { language, t, translateStatus } = useI18n();
-  const { data, error } = useResource("runtime-status-bar", getRuntimeStatus, { refreshIntervalMs: 5000 });
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
+  const { data, error } = useResource("runtime-status-bar", getRuntimeStatus, {
+    refreshIntervalMs: intervalMs,
+    autoRefreshEnabled,
+  });
   const runtime = data?.data;
 
   return (

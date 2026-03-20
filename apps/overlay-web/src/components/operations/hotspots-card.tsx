@@ -1,14 +1,17 @@
 import type { OpsIncidentHotspot } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
 import { DrilldownLink } from "../evidence/drilldown-link.js";
 
 export function HotspotsCard({ hotspots }: { hotspots: OpsIncidentHotspot[] }) {
+  const { t } = useI18n();
+
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Operational hotspots</h3>
-          <p>Shortlist of the places most likely to need read-only follow-up first.</p>
+          <h3>{t("operations.hotspotsTitle")}</h3>
+          <p>{t("operations.hotspotsDescription")}</p>
         </div>
       </div>
 

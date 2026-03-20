@@ -11,14 +11,19 @@ import { PageObservability } from "../components/page-observability.js";
 import { DrilldownLink } from "../components/evidence/drilldown-link.js";
 import { overlayApi } from "../lib/api.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function AdoptionPage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const { data, loading, error, retry } = useResource(
     "dashboard-adoption",
     overlayApi.getDashboardAdoption,
-    { refreshIntervalMs: 15000 },
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+    },
   );
 
   return (
@@ -50,8 +55,8 @@ export function AdoptionPage() {
             <article className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Next drilldowns</h3>
-                  <p>Move from proxy signals to the workspace, session, and agent detail pages.</p>
+                  <h3>{t("adoption.nextDrilldownsTitle")}</h3>
+                  <p>{t("adoption.nextDrilldownsDescription")}</p>
                 </div>
               </div>
               <div className="dashboard-card-actions">

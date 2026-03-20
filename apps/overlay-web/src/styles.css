@@ -95,6 +95,42 @@ body {
   gap: 8px;
 }
 
+.refresh-mode-picker {
+  padding: 10px;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.refresh-mode-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.refresh-mode-button {
+  border: 1px solid var(--panel-border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.refresh-mode-button-active {
+  background: var(--accent-soft);
+  border-color: rgba(0, 109, 119, 0.35);
+  font-weight: 600;
+}
+
+.refresh-mode-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .language-button {
   flex: 1;
   border: 1px solid var(--panel-border);
@@ -2322,6 +2358,11 @@ th.cell-align-right {
   gap: 14px;
 }
 
+.dashboard-hero-card {
+  padding: 14px;
+  gap: 12px;
+}
+
 .dashboard-signal-healthy {
   border-color: #b8e2cf;
   background: linear-gradient(180deg, #f3fbf7 0%, #ffffff 100%);
@@ -2366,11 +2407,23 @@ th.cell-align-right {
   line-height: 1.55;
 }
 
+.dashboard-summary-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: calc(1.55em * 2);
+}
+
 .dashboard-card-actions,
 .chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.dashboard-card-actions-hero {
+  gap: 6px;
 }
 
 .dashboard-drilldown {
@@ -2383,6 +2436,11 @@ th.cell-align-right {
   padding: 8px 12px;
   font-size: 0.84rem;
   color: inherit;
+}
+
+.dashboard-hero-card .dashboard-drilldown {
+  padding: 7px 10px;
+  font-size: 0.79rem;
 }
 
 .dashboard-drilldown:hover {
@@ -2413,6 +2471,10 @@ th.cell-align-right {
   gap: 8px;
 }
 
+.dashboard-hero-evidence {
+  gap: 6px;
+}
+
 .evidence-pill {
   display: inline-flex;
   align-items: center;
@@ -2424,6 +2486,10 @@ th.cell-align-right {
   padding: 7px 12px;
   color: inherit;
   background: rgba(255, 255, 255, 0.94);
+}
+
+.dashboard-hero-evidence .evidence-pill {
+  padding: 6px 10px;
 }
 
 .evidence-pill-info {
@@ -2448,6 +2514,22 @@ th.cell-align-right {
   text-overflow: ellipsis;
 }
 
+.dashboard-hero-evidence .evidence-pill-label {
+  max-width: 150px;
+}
+
+.dashboard-more-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 .trend-chip {
   display: inline-flex;
   align-items: center;
@@ -2459,6 +2541,11 @@ th.cell-align-right {
   letter-spacing: 0.05em;
   background: #eef3f8;
   color: #42576d;
+}
+
+.dashboard-hero-card .trend-chip {
+  padding: 4px 9px;
+  font-size: 0.7rem;
 }
 
 .trend-chip-healthy {

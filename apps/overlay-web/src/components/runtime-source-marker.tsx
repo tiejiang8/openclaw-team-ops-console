@@ -2,12 +2,17 @@ import { useCallback, useMemo } from "react";
 
 import { getRuntimeStatus } from "../lib/api/runtime.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function RuntimeSourceMarker() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const loadSource = useCallback(() => getRuntimeStatus(), []);
-  const { data, loading, error } = useResource("runtime-source-marker", loadSource, { refreshIntervalMs: 5000 });
+  const { data, loading, error } = useResource("runtime-source-marker", loadSource, {
+    refreshIntervalMs: intervalMs,
+    autoRefreshEnabled,
+  });
 
   const marker = useMemo(() => {
     if (loading) {

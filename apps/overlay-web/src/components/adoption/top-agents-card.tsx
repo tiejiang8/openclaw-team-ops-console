@@ -1,14 +1,17 @@
 import type { TopAgentUsage } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
 import { DrilldownLink } from "../evidence/drilldown-link.js";
 
 export function TopAgentsCard({ agents }: { agents: TopAgentUsage[] }) {
+  const { t } = useI18n();
+
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Top agents</h3>
-          <p>Which agents are carrying the most usage footprint.</p>
+          <h3>{t("adoption.topAgentsTitle")}</h3>
+          <p>{t("adoption.topAgentsDescription")}</p>
         </div>
       </div>
 
@@ -18,7 +21,11 @@ export function TopAgentsCard({ agents }: { agents: TopAgentUsage[] }) {
             <div>
               <div className="cell-title">{agent.agentName}</div>
               <div className="cell-subtitle">
-                {agent.sessions} sessions, {agent.turns} turns, {agent.activeWorkspaces} active workspaces
+                {t("adoption.topAgentsSummary", {
+                  sessions: agent.sessions,
+                  turns: agent.turns,
+                  count: agent.activeWorkspaces,
+                })}
               </div>
             </div>
             <DrilldownLink link={agent.detailLink} tone="subtle" />

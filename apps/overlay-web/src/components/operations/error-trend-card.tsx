@@ -1,14 +1,17 @@
 import type { OpsTrendPoint } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
+
 export function ErrorTrendCard({ points }: { points: OpsTrendPoint[] }) {
+  const { t } = useI18n();
   const maxValue = Math.max(...points.map((point) => Math.max(point.errors, point.warnings, 1)), 1);
 
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Error trend</h3>
-          <p>Last 24h warnings and errors, grouped into short operational buckets.</p>
+          <h3>{t("operations.errorTrendTitle")}</h3>
+          <p>{t("operations.errorTrendDescription")}</p>
         </div>
       </div>
 

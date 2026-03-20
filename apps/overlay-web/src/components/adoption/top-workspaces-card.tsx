@@ -1,14 +1,17 @@
 import type { TopWorkspaceUsage } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
 import { DrilldownLink } from "../evidence/drilldown-link.js";
 
 export function TopWorkspacesCard({ workspaces }: { workspaces: TopWorkspaceUsage[] }) {
+  const { t } = useI18n();
+
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Top workspaces</h3>
-          <p>Where usage depth is currently highest.</p>
+          <h3>{t("adoption.topWorkspacesTitle")}</h3>
+          <p>{t("adoption.topWorkspacesDescription")}</p>
         </div>
       </div>
 
@@ -18,7 +21,11 @@ export function TopWorkspacesCard({ workspaces }: { workspaces: TopWorkspaceUsag
             <div>
               <div className="cell-title">{workspace.workspaceName}</div>
               <div className="cell-subtitle">
-                {workspace.sessions} sessions, {workspace.turns} turns, avg {workspace.avgSessionDurationMinutes}m
+                {t("adoption.topWorkspacesSummary", {
+                  sessions: workspace.sessions,
+                  turns: workspace.turns,
+                  minutes: workspace.avgSessionDurationMinutes,
+                })}
               </div>
             </div>
             <DrilldownLink link={workspace.detailLink} tone="subtle" />

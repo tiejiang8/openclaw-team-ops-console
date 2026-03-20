@@ -14,20 +14,33 @@ import { SourceTracePanel } from "../components/evidence/source-trace-panel.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
 import { overlayApi } from "../lib/api.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
   const { language, t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
 
   const { data, loading, error, retry } = useResource(
     "dashboard-overview",
     overlayApi.getDashboardOverview,
-    { refreshIntervalMs: 15000 },
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+      preserveDataOnError: true,
+      errorBackoffMs: 60_000,
+    },
   );
-  const { data: bootstrapData, retry: retryBootstrap } = useResource("bootstrap-status", overlayApi.getBootstrapStatus);
+  const { data: bootstrapData, retry: retryBootstrap } = useResource("bootstrap-status", overlayApi.getBootstrapStatus, {
+    autoRefreshEnabled: false,
+    preserveDataOnError: true,
+  });
 
-  useStreamRefresh("activity", retry);
-  useStreamRefresh("bootstrap_status", retryBootstrap);
+  useStreamRefresh("activity", retry, { enabled: autoRefreshEnabled, throttleMs: intervalMs || 30_000 });
+  useStreamRefresh("bootstrap_status", retryBootstrap, {
+    enabled: autoRefreshEnabled,
+    throttleMs: intervalMs || 30_000,
+  });
 
   const isEmpty = !loading && !error && (data?.data.heroKpis.length ?? 0) === 0;
 
@@ -65,6 +78,8 @@ export function OverviewPage() {
         isEmpty={isEmpty}
         emptyTitle={t("overview.emptyTitle")}
         emptyMessage={t("overview.emptyMessage")}
+        preserveChildrenOnError={Boolean(data)}
+        staleWarning={error && data ? t("refresh.lastDataRetained") : null}
       >
         {data ? (
           <>

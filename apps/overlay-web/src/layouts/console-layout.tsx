@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { RefreshModePicker } from "../components/refresh/refresh-mode-picker.js";
 import { RoleSwitcher } from "../components/role/role-switcher.js";
 import { RuntimeStatusBar } from "../components/runtime/runtime-status-bar.js";
 import { RuntimeSourceMarker } from "../components/runtime-source-marker.js";
@@ -117,6 +118,8 @@ export function ConsoleLayout() {
               </div>
             </div>
           </section>
+
+          <RefreshModePicker />
         </div>
 
         <div style={{ display: "grid", gap: 8 }}>

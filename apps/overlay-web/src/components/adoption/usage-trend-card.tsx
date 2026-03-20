@@ -1,14 +1,17 @@
 import type { UsageTrendPoint } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
+
 export function UsageTrendCard({ points }: { points: UsageTrendPoint[] }) {
+  const { t } = useI18n();
   const maxSessions = Math.max(...points.map((point) => Math.max(point.sessions, 1)), 1);
 
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Usage trend</h3>
-          <p>Daily usage proxy for the latest seven days.</p>
+          <h3>{t("adoption.usageTrendTitle")}</h3>
+          <p>{t("adoption.usageTrendDescription")}</p>
         </div>
       </div>
 

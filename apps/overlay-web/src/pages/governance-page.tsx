@@ -9,14 +9,19 @@ import { RiskPostureCard } from "../components/governance/risk-posture-card.js";
 import { PageObservability } from "../components/page-observability.js";
 import { overlayApi } from "../lib/api.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function GovernancePage() {
   const { t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const { data, loading, error, retry } = useResource(
     "dashboard-governance",
     overlayApi.getDashboardGovernance,
-    { refreshIntervalMs: 20000 },
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+    },
   );
 
   return (
@@ -43,8 +48,8 @@ export function GovernancePage() {
             <article className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Next drilldowns</h3>
-                  <p>Every governance conclusion should still resolve back to a finding, recommendation, or evidence record.</p>
+                  <h3>{t("governance.nextDrilldownsTitle")}</h3>
+                  <p>{t("governance.nextDrilldownsDescription")}</p>
                 </div>
               </div>
               <div className="dashboard-card-actions">

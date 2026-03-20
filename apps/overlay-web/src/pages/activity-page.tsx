@@ -5,6 +5,7 @@ import { PageObservability } from "../components/page-observability.js";
 import { overlayApi } from "../lib/api.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useStreamRefresh } from "../components/streaming-provider.js";
 import { useResource } from "../lib/use-resource.js";
 import type { ActivityEventDto } from "@openclaw-team-ops/shared";
@@ -13,6 +14,7 @@ type ActivityTypeFilter = "all" | "cron" | "node" | "session" | "log";
 
 export function ActivityPage() {
   const { language, t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const [typeFilter, setTypeFilter] = useState<ActivityTypeFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
@@ -26,10 +28,13 @@ export function ActivityPage() {
   const { data, loading, error, retry } = useResource(
     `activity-${typeFilter}-${severityFilter}`,
     loadActivity,
-    { refreshIntervalMs: 10000 }
+    {
+      refreshIntervalMs: intervalMs,
+      autoRefreshEnabled,
+    },
   );
 
-  useStreamRefresh("activity", retry);
+  useStreamRefresh("activity", retry, { enabled: autoRefreshEnabled, throttleMs: intervalMs || 30_000 });
 
   const getSeverityLabel = (severity: string) => {
     switch (severity) {

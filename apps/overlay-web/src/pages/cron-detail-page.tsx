@@ -7,13 +7,18 @@ import { StatusBadge } from "../components/status-badge.js";
 import { getCronJob } from "../lib/api/cron.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
+import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function CronDetailPage() {
   const { id = "" } = useParams();
   const { language, t } = useI18n();
+  const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
   const loadCronJob = useMemo(() => () => getCronJob(id), [id]);
-  const { data, loading, error, retry } = useResource(`cron-detail:${id}`, loadCronJob, { refreshIntervalMs: 5000 });
+  const { data, loading, error, retry } = useResource(`cron-detail:${id}`, loadCronJob, {
+    refreshIntervalMs: intervalMs,
+    autoRefreshEnabled,
+  });
   const job = data?.data;
 
   return (

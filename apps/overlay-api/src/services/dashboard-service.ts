@@ -95,6 +95,26 @@ function safeLabel(value: string | undefined, fallback: string): string {
   return value && value.trim().length > 0 ? value : fallback;
 }
 
+function formatCountLabel(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function joinNaturalLabels(labels: string[]): string {
+  if (labels.length === 0) {
+    return "";
+  }
+
+  if (labels.length === 1) {
+    return labels[0]!;
+  }
+
+  if (labels.length === 2) {
+    return `${labels[0]!} and ${labels[1]!}`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]!}`;
+}
+
 function buildLink(label: string, to: string, description?: string, badge?: string): DashboardDrilldownLink {
   return {
     label,
@@ -364,8 +384,8 @@ export class DashboardService {
           title: "Stability anomaly",
           summary:
             context.errors24h > 0
-              ? `${context.errors24h} errors were observed in the last 24 hours, with the heaviest pressure coming from ${context.primaryHotspotLabel}.`
-              : `No new error spikes were observed in the last 24 hours, but ${context.runtime.data.cron.overdue} cron jobs remain overdue.`,
+              ? `${context.errors24h} log errors were observed in the last 24 hours, with the heaviest pressure coming from ${context.primaryHotspotLabel}.`
+              : `No new log-error spikes were observed in the last 24 hours, but ${context.runtime.data.cron.overdue} cron jobs remain overdue.`,
           severity: context.errors24h > 0 ? "error" : context.runtime.data.cron.overdue > 0 ? "warn" : "info",
           trendLabel: `${context.runtime.data.nodes.stale} stale nodes`,
           detailLink: buildLink("View details", "/operations"),
@@ -485,6 +505,28 @@ export class DashboardService {
     const context = await this.collectContext(10);
     const healthScore = this.computeHealthScore(context);
     const hotspots = this.buildHotspots(context);
+    const configHealthItems = [
+      context.configMismatchCount > 0 ? formatCountLabel(context.configMismatchCount, "config mismatch", "config mismatches") : null,
+      context.authGapCount > 0 ? formatCountLabel(context.authGapCount, "auth gap", "auth gaps") : null,
+      context.risks.data.coverageGaps > 0 ? formatCountLabel(context.risks.data.coverageGaps, "coverage gap", "coverage gaps") : null,
+      context.risks.data.staleTargets > 0 ? formatCountLabel(context.risks.data.staleTargets, "stale target", "stale targets") : null,
+    ].filter((item): item is string => Boolean(item));
+    const summary =
+      hotspots.length > 0
+        ? `${context.primaryHotspotLabel} is carrying the highest operational pressure.`
+        : "No concentrated operational hotspot was detected in this pass.";
+    const configHealthSummary =
+      configHealthItems.length > 0
+        ? `${joinNaturalLabels(configHealthItems)} are the main operational hygiene issues.`
+        : "No configuration mismatches, auth gaps, coverage gaps, or stale targets were detected in this pass.";
+    const impactSummary =
+      context.runtime.data.nodes.stale > 0
+        ? `${formatCountLabel(context.runtime.data.nodes.stale, "stale node", "stale nodes")} are likely degrading cron execution and runtime freshness.`
+        : context.runtime.data.cron.overdue > 0
+          ? `${formatCountLabel(context.runtime.data.cron.overdue, "overdue cron job", "overdue cron jobs")} are the main remaining runtime drag.`
+          : context.errors24h > 0
+            ? `${formatCountLabel(context.errors24h, "log error", "log errors")} were observed in the last 24 hours, even though no stale nodes or overdue cron jobs were detected.`
+            : "No stale nodes or overdue cron jobs were detected in this pass.";
 
     const data: OperationsDashboard = {
       healthScore,
@@ -492,7 +534,7 @@ export class DashboardService {
       staleNodes: context.runtime.data.nodes.stale,
       overdueCron: context.runtime.data.cron.overdue,
       connectionState: context.runtime.data.gateway.connectionState,
-      summary: `${context.primaryHotspotLabel} is carrying the highest operational pressure, while ${context.configMismatchCount} configuration mismatches still need read-only inspection.`,
+      summary: `${summary} ${configHealthSummary}`,
       trendPoints: this.buildOperationsTrend(context),
       hotspots,
       configHealth: {
@@ -500,17 +542,14 @@ export class DashboardService {
         authCoverageGapCount: context.authGapCount,
         staleTargets: context.risks.data.staleTargets,
         coverageGapCount: context.risks.data.coverageGaps,
-        summary: `${context.configMismatchCount} config mismatches, ${context.authGapCount} auth gaps, and ${context.risks.data.coverageGaps} coverage gaps are the main operational hygiene issues.`,
+        summary: configHealthSummary,
         detailLinks: [
           buildLink("View details", "/coverage"),
           buildLink("View related findings", "/findings"),
           buildLink("View evidence", "/evidence"),
         ],
       },
-      impactSummary:
-        context.runtime.data.nodes.stale > 0
-          ? `${context.runtime.data.nodes.stale} stale nodes are likely degrading cron execution and runtime freshness.`
-          : `${context.runtime.data.cron.overdue} overdue cron jobs are the main remaining runtime drag.`,
+      impactSummary,
       recentActivity: context.activity.data.slice(0, 8),
       quickLinks: [
         buildLink("View details", "/logs", "Inspect raw runtime signals"),
@@ -995,7 +1034,7 @@ export class DashboardService {
           label,
           type: "error-type",
           count: 1,
-          summary: "This subsystem is over-indexing on warnings and errors in the latest snapshot.",
+          summary: "This subsystem is over-indexing on warnings and log errors in the latest snapshot.",
           detailLink: buildLink("View details", "/logs"),
         });
       }
