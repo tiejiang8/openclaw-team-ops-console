@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
+import type { AddressInfo, Socket } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,6 +49,7 @@ const playwrightLinuxLibDir = path.join(repoRoot, ".cache/playwright-system-libs
 
 async function startServer(app: ListenTarget): Promise<StartedServer> {
   return new Promise((resolve, reject) => {
+    const sockets = new Set<Socket>();
     const server = app.listen(0, "127.0.0.1", () => {
       const address = server.address();
 
@@ -61,6 +62,10 @@ async function startServer(app: ListenTarget): Promise<StartedServer> {
         url: `http://127.0.0.1:${(address as AddressInfo).port}`,
         close: () =>
           new Promise<void>((closeResolve, closeReject) => {
+            for (const socket of sockets) {
+              socket.destroy();
+            }
+
             server.close((error) => {
               if (error) {
                 closeReject(error);
@@ -72,6 +77,15 @@ async function startServer(app: ListenTarget): Promise<StartedServer> {
           }),
       });
     });
+
+    if ("on" in server && typeof server.on === "function") {
+      server.on("connection", (socket: Socket) => {
+        sockets.add(socket);
+        socket.on("close", () => {
+          sockets.delete(socket);
+        });
+      });
+    }
 
     server.once("error", reject);
   });
@@ -230,9 +244,7 @@ async function withSidecarBrowserFixture<T>(
     args: ["--no-sandbox"],
     env: launchEnvironment,
   });
-  const context = await browser.newContext({
-    locale: "en-US",
-  });
+  const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
 

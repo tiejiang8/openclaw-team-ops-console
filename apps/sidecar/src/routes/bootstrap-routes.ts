@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createResponseMeta } from "@openclaw-team-ops/shared";
 import type { BootstrapStatusService } from "../services/bootstrap-status.js";
 
-export function createBootstrapRouter(service: BootstrapStatusService) {
+export function createBootstrapRouter(service: BootstrapStatusService): Router {
   const router = Router();
 
   router.get("/status", async (_req, res) => {

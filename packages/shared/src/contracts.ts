@@ -36,11 +36,19 @@ import type { BootstrapStatusDto, BootstrapStatusResponse } from "./contracts/bo
 import type { FleetMapDto, FleetMapResponse } from "./contracts/fleet-map.js";
 import type { ActivityEventDto, ActivityResponse } from "./contracts/activity.js";
 import type { StreamingEventDto } from "./contracts/streaming.js";
+import type {
+  AdoptionDashboard,
+  GovernanceDashboard,
+  OperationsDashboard,
+  OutcomesDashboard,
+  RoleOverviewSummary,
+} from "./contracts/dashboard.js";
 
 export * from "./contracts/bootstrap.js";
 export * from "./contracts/fleet-map.js";
 export * from "./contracts/activity.js";
 export * from "./contracts/streaming.js";
+export * from "./contracts/dashboard.js";
 
 export interface ResponseMeta extends ApiMeta {}
 
@@ -136,3 +144,8 @@ export type FleetMapResponseContract = FleetMapResponse;
 export type ActivityResponseContract = ActivityResponse;
 export type RecommendationsResponseContract = RecommendationsResponse;
 export type RecommendationResponseContract = RecommendationResponse;
+export type DashboardOverviewResponse = ItemResponse<RoleOverviewSummary>;
+export type DashboardOperationsResponse = ItemResponse<OperationsDashboard>;
+export type DashboardAdoptionResponse = ItemResponse<AdoptionDashboard>;
+export type DashboardOutcomesResponse = ItemResponse<OutcomesDashboard>;
+export type DashboardGovernanceResponse = ItemResponse<GovernanceDashboard>;

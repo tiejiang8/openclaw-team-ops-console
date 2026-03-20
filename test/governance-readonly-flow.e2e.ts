@@ -5,11 +5,10 @@ import { withGovernanceBrowserFixture } from "./helpers/browser-e2e-fixture.js";
 
 test("browser e2e: mock governance flow stays read-only from risks to finding detail, evidence, and recommendations", async () => {
   await withGovernanceBrowserFixture("partial-coverage", async ({ page, webUrl }) => {
-    await page.goto(`${webUrl}/risks?f_type=dangling-binding`, {
-      waitUntil: "networkidle",
-    });
+    await page.goto(`${webUrl}/risks?f_type=dangling-binding`);
 
     await page.getByRole("heading", { name: "Risks" }).waitFor();
+    await page.locator("tbody tr").first().waitFor();
     await page.getByRole("heading", { name: "Open Findings" }).waitFor();
 
     const riskRowLink = page.locator("tbody tr .inline-link").first();

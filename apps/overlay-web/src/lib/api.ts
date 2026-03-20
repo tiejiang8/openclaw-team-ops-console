@@ -32,6 +32,11 @@ import type {
   BootstrapStatusResponse,
   FleetMapResponseContract,
   ActivityResponseContract,
+  DashboardAdoptionResponse,
+  DashboardGovernanceResponse,
+  DashboardOperationsResponse,
+  DashboardOutcomesResponse,
+  DashboardOverviewResponse,
   RecommendationsResponseContract,
   RecommendationResponseContract,
 } from "@openclaw-team-ops/shared";
@@ -79,6 +84,11 @@ export const overlayApi = {
     request<RecommendationsResponseContract>(withQuery("/api/recommendations", params)),
   getRecommendation: (id: string) => 
     request<RecommendationResponseContract>(`/api/recommendations/${encodeURIComponent(id)}`),
+  getDashboardOverview: () => request<DashboardOverviewResponse>("/api/dashboard/overview"),
+  getDashboardOperations: () => request<DashboardOperationsResponse>("/api/dashboard/operations"),
+  getDashboardAdoption: () => request<DashboardAdoptionResponse>("/api/dashboard/adoption"),
+  getDashboardOutcomes: () => request<DashboardOutcomesResponse>("/api/dashboard/outcomes"),
+  getDashboardGovernance: () => request<DashboardGovernanceResponse>("/api/dashboard/governance"),
   getSummary: () => request<SummaryResponse>("/api/summary"),
   getTargets: () => request<TargetsResponse>("/api/targets"),
   getTarget: (targetId: string) => request<TargetResponse>(`/api/targets/${encodeURIComponent(targetId)}`),

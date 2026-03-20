@@ -16,6 +16,8 @@ import { createActivityRouter } from "./routes/activity-routes.js";
 import { StreamingService } from "./services/streaming-service.js";
 import { StreamingController } from "./controllers/streaming-controller.js";
 import { createStreamingRouter } from "./routes/streaming-routes.js";
+import { DashboardService } from "./services/dashboard-service.js";
+import { createDashboardRouter } from "./routes/dashboard-routes.js";
 
 export function createOverlayApiApp(sidecarClient: SidecarClient): Express {
   const app = express();
@@ -28,6 +30,7 @@ export function createOverlayApiApp(sidecarClient: SidecarClient): Express {
 
   const activityService = new ActivityService(sidecarClient);
   const activityController = new ActivityController(activityService);
+  const dashboardService = new DashboardService(overlayService, activityService);
 
   const streamingService = new StreamingService(sidecarClient, activityService);
   const streamingController = new StreamingController(streamingService);
@@ -42,6 +45,7 @@ export function createOverlayApiApp(sidecarClient: SidecarClient): Express {
   app.use("/api/bootstrap", createBootstrapRouter(bootstrapController));
   app.use("/api/fleet-map", createFleetMapRouter(fleetMapController));
   app.use("/api/activity", createActivityRouter(activityController));
+  app.use("/api/dashboard", createDashboardRouter(dashboardService));
   app.use("/api/stream", createStreamingRouter(streamingController));
 
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {

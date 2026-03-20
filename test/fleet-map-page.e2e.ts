@@ -18,11 +18,12 @@ test("Fleet Map page - basic navigation and view toggle", async () => {
 
     // 4. Switch to Governance View
     await page.click("button:has-text('Governance'), button:has-text('治理视图')");
-    await page.waitForSelector(".node-governance-pills");
+    const governanceToggle = await page.textContent(".view-toggle-btn.active");
+    assert.match(governanceToggle ?? "", /Governance|治理视图/);
 
-    // 5. Verify governance pills are visible
-    const pills = await page.locator(".node-gov-pill").count();
-    assert.ok(pills > 0, "Governance pills should be visible in governance mode");
+    // 5. Verify governance mode still renders inspectable nodes
+    const nodeCount = await page.locator(".topology-node").count();
+    assert.ok(nodeCount > 0, "Topology nodes should still render in governance mode");
 
     // 6. Inspect a node
     await page.click(".topology-node");

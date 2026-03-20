@@ -36,11 +36,10 @@ test("browser e2e: logs page opens the latest log file and shows log details", a
     );
 
     await withCustomSidecarBrowserFixture(sidecarApp, async ({ page, webUrl }) => {
-      await page.goto(`${webUrl}/logs`, {
-        waitUntil: "networkidle",
-      });
+      await page.goto(`${webUrl}/logs`);
 
       await page.getByRole("heading", { name: "Logs", exact: true }).waitFor();
+      await page.locator("tbody tr").first().waitFor();
       await page.getByText("Read-only", { exact: true }).waitFor();
       await page.getByRole("heading", { name: "Log Entries" }).waitFor();
 

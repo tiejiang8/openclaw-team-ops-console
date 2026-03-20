@@ -1,206 +1,53 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Link } from "react-router-dom";
 
+import { AttentionCard } from "../components/dashboard/attention-card.js";
+import { HeroKpiCard } from "../components/dashboard/hero-kpi-card.js";
+import { RoleSummaryCard } from "../components/dashboard/role-summary-card.js";
 import { DataState } from "../components/data-state.js";
-import { CoverageBadge } from "../components/coverage-badge.js";
-import { MetricCard } from "../components/metric-card.js";
 import { PageObservability } from "../components/page-observability.js";
 import { useStreamRefresh } from "../components/streaming-provider.js";
 import { RuntimeStatusCard } from "../components/runtime/runtime-status-card.js";
 import { ConnectionChecklist } from "../components/runtime/connection-checklist.js";
-import { StatusBadge } from "../components/status-badge.js";
+import { EvidencePill } from "../components/evidence/evidence-pill.js";
+import { SourceTracePanel } from "../components/evidence/source-trace-panel.js";
 import { formatTimestamp } from "../lib/format.js";
 import { useI18n } from "../lib/i18n.js";
 import { overlayApi } from "../lib/api.js";
-import { getRuntimeStatus } from "../lib/api/runtime.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
-  const { language, t, translateComponentType, translateFreshness, translateSignal, translateStatus, translateTargetSourceKind } = useI18n();
+  const { language, t } = useI18n();
 
-  const loadStatic = useCallback(async () => {
-    const [summary, targets, coverage] = await Promise.all([
-      overlayApi.getSummary(),
-      overlayApi.getTargets(),
-      overlayApi.getCoverage(),
-    ]);
-    return { summary, targets, coverage };
-  }, []);
-
-  const loadRuntime = useCallback(async () => {
-    const [health, runtimeStatus, risksSummary] = await Promise.all([
-      overlayApi.getHealth(),
-      getRuntimeStatus(),
-      overlayApi.getRisksSummary(),
-    ]);
-    return { health, runtimeStatus, risksSummary };
-  }, []);
-
-  const loadActivity = useCallback(async () => {
-    const result = await overlayApi.getActivity({ limit: 5 });
-    return result.data;
-  }, []);
-
-  const staticRes = useResource("overview-static", loadStatic, { refreshIntervalMs: 30000 });
-  const runtimeRes = useResource("overview-runtime", loadRuntime, { refreshIntervalMs: 10000 });
-  const activityRes = useResource("overview-activity", loadActivity, { refreshIntervalMs: 15000 });
-
-  const loading = staticRes.loading || runtimeRes.loading;
-  const error = staticRes.error || runtimeRes.error || activityRes.error;
-
-  const data = useMemo(() => {
-    if (!staticRes.data || !runtimeRes.data) {
-      return null;
-    }
-
-    return {
-      ...staticRes.data,
-      ...runtimeRes.data,
-      recentActivity: activityRes.data ?? [],
-    };
-  }, [staticRes.data, runtimeRes.data, activityRes.data]);
-
-  const retry = useCallback(() => {
-    staticRes.retry();
-    runtimeRes.retry();
-    activityRes.retry();
-  }, [staticRes, runtimeRes, activityRes]);
-
+  const { data, loading, error, retry } = useResource(
+    "dashboard-overview",
+    overlayApi.getDashboardOverview,
+    { refreshIntervalMs: 15000 },
+  );
   const { data: bootstrapData, retry: retryBootstrap } = useResource("bootstrap-status", overlayApi.getBootstrapStatus);
 
+  useStreamRefresh("activity", retry);
   useStreamRefresh("bootstrap_status", retryBootstrap);
 
-  const drillDownItems = useMemo(() => {
-    if (!data) {
-      return [];
+  const isEmpty = !loading && !error && (data?.data.heroKpis.length ?? 0) === 0;
+
+  const renderRecentActivity = useCallback(() => {
+    if (!data?.data.recentActivity.length) {
+      return <p className="state-message">{t("activity.empty")}</p>;
     }
 
-    return [
-      { to: "/targets", label: t("nav.targets"), count: data.targets.data.length },
-      { to: "/coverage", label: t("nav.coverage"), count: data.coverage.data.collections.length },
-      { to: "/agents", label: t("nav.agents"), count: data.summary.data.totals.agents },
-      { to: "/workspaces", label: t("nav.workspaces"), count: data.summary.data.totals.workspaces },
-      { to: "/sessions", label: t("nav.sessions"), count: data.summary.data.totals.sessions },
-      { to: "/bindings", label: t("nav.bindings"), count: data.summary.data.totals.bindings },
-      { to: "/auth-profiles", label: t("nav.authProfiles"), count: data.summary.data.totals.authProfiles },
-      { to: "/cron", label: t("nav.cron"), count: data.runtimeStatus.data.cron.total },
-      { to: "/nodes", label: t("nav.nodes"), count: data.runtimeStatus.data.nodes.paired },
-      { to: "/topology", label: t("nav.topology"), count: data.summary.runtimeStatuses.length },
-    ];
-  }, [data, t]);
-
-  const fleetMetrics = useMemo(() => {
-    if (!data) {
-      return {
-        targetCount: 0,
-        warningCount: 0,
-        highestRiskScore: 0,
-      };
-    }
-
-    return {
-      targetCount: data.targets.data.length,
-      warningCount: data.targets.data.reduce((count: number, target: any) => count + target.warningCount, 0),
-      highestRiskScore: Math.max(...data.targets.data.map((target: any) => target.riskScore), 0),
-    };
-  }, [data]);
-
-  const primaryMetrics = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-
-    const gatewayHealth = data.runtimeStatus.data.gateway.dataReaderHealth;
-    const gatewayValue = gatewayHealth === "healthy"
-      ? translateStatus("healthy")
-      : gatewayHealth === "partial"
-        ? translateStatus("partial")
-        : translateStatus(data.runtimeStatus.data.gateway.connectionState);
-    const runtimeModeLabel = data.runtimeStatus.data.sourceMode
-      ? t(`runtime.mode.${data.runtimeStatus.data.sourceMode}`)
-      : t("common.notAvailable");
-
-    return [
-      {
-        to: "/activity",
-        label: t("runtime.gateway"),
-        value: gatewayValue,
-        detail: `${t("runtime.sourceMode")}: ${runtimeModeLabel}`,
-        borderColor: "#b8e2cf",
-        background: "linear-gradient(180deg, #f1fbf6 0%, #ffffff 100%)",
-        accentColor: "#186845",
-      },
-      {
-        to: "/risks",
-        label: t("overview.metric.targetRisk"),
-        value: fleetMetrics.highestRiskScore,
-        detail: `${t("overview.metric.openFindings")}: ${data.risksSummary.data.openFindings}`,
-        borderColor: "#efb4bd",
-        background: "linear-gradient(180deg, #fff3f5 0%, #ffffff 100%)",
-        accentColor: "#8a202d",
-      },
-      {
-        to: "/findings",
-        label: t("overview.metric.criticalFindings"),
-        value: data.risksSummary.data.bySeverity.critical,
-        detail: `${t("overview.metric.openFindings")}: ${data.risksSummary.data.openFindings}`,
-        borderColor: "#efb4bd",
-        background: "linear-gradient(180deg, #fff6f7 0%, #ffffff 100%)",
-        accentColor: "#8a202d",
-      },
-      {
-        to: "/targets",
-        label: t("overview.metric.targetWarnings"),
-        value: fleetMetrics.warningCount,
-        detail: `${t("overview.metric.targets")}: ${fleetMetrics.targetCount}`,
-        borderColor: "#edd492",
-        background: "linear-gradient(180deg, #fffbef 0%, #ffffff 100%)",
-        accentColor: "#734f02",
-      },
-    ];
-  }, [data, fleetMetrics, t, translateStatus]);
-
-  const secondaryMetrics = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-
-    return [
-      {
-        label: t("runtime.nodes"),
-        value: data.runtimeStatus.data.nodes.paired,
-        detail: t("runtime.nodesSummary", {
-          connected: data.runtimeStatus.data.nodes.connected,
-          paired: data.runtimeStatus.data.nodes.paired,
-        }),
-      },
-      {
-        label: t("runtime.cron"),
-        value: data.runtimeStatus.data.cron.total,
-        detail: t("runtime.cronSummary", {
-          total: data.runtimeStatus.data.cron.total,
-          overdue: data.runtimeStatus.data.cron.overdue,
-        }),
-      },
-      { label: t("overview.metric.targets"), value: fleetMetrics.targetCount },
-      { label: t("overview.metric.openFindings"), value: data.risksSummary.data.openFindings },
-      { label: t("overview.metric.agents"), value: data.summary.data.totals.agents },
-      { label: t("overview.metric.workspaces"), value: data.summary.data.totals.workspaces },
-      {
-        label: t("overview.metric.sessions"),
-        value: data.summary.data.totals.sessions,
-        detail: t("common.activeCount", { count: data.summary.data.activeSessions }),
-      },
-      { label: t("overview.metric.bindings"), value: data.summary.data.totals.bindings },
-      { label: t("overview.metric.authProfiles"), value: data.summary.data.totals.authProfiles },
-      {
-        label: t("overview.metric.snapshotTime"),
-        value: formatTimestamp(data.summary.meta.generatedAt, language),
-      },
-    ];
-  }, [data, fleetMetrics.targetCount, language, t]);
-
-  const isEmpty = !loading && !error && data?.summary.runtimeStatuses.length === 0;
+    return (
+      <div className="timeline-mini">
+        {data.data.recentActivity.map((event) => (
+          <div key={event.id} className="timeline-mini-item">
+            <span className={`signal-dot signal-${event.severity}`}></span>
+            <span className="event-time-mini">{formatTimestamp(event.timestamp, language)}</span>
+            <span className="event-message-mini">{event.message}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }, [data?.data.recentActivity, language, t]);
 
   return (
     <section className="page fade-in-up">
@@ -209,7 +56,7 @@ export function OverviewPage() {
         <p>{t("overview.description")}</p>
       </header>
 
-      <PageObservability meta={data?.summary.meta} />
+      <PageObservability meta={data?.meta} />
 
       <DataState
         loading={loading}
@@ -221,250 +68,156 @@ export function OverviewPage() {
       >
         {data ? (
           <>
-            {bootstrapData?.data ? <ConnectionChecklist status={bootstrapData.data as any} /> : null}
+            {bootstrapData?.data ? <ConnectionChecklist status={bootstrapData.data as never} /> : null}
 
-            <div className={`health-banner health-${data.health.status}`}>
-              <p>
-                {t("overview.healthPrefix")} <StatusBadge status={data.health.status} />{" "}
-                {t("overview.healthSuffix", { count: data.summary.runtimeStatuses.length })}
-              </p>
-              <p>{t("overview.lastHealthCheck", { time: formatTimestamp(data.health.time, language) })}</p>
-            </div>
-
-            <section style={{ display: "grid", gap: 10 }}>
-              <p className="language-switcher-label" style={{ margin: 0 }}>
-                {t("overview.primaryMetrics")}
-              </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                {primaryMetrics.map((item) => (
-                  <Link
-                    key={item.label}
-                    to={item.to}
-                    className="metric-card fade-in-up"
-                    style={{
-                      color: "inherit",
-                      textDecoration: "none",
-                      display: "grid",
-                      gap: 12,
-                      minHeight: 152,
-                      borderColor: item.borderColor,
-                      background: item.background,
-                    }}
-                  >
-                    <div style={{ display: "grid", gap: 10 }}>
-                      <p className="metric-label" style={{ margin: 0 }}>
-                        {item.label}
-                      </p>
-                      <p className="metric-value" style={{ margin: 0, fontSize: "1.58rem", color: item.accentColor }}>
-                        {item.value}
-                      </p>
-                      <p className="metric-detail" style={{ margin: 0 }}>
-                        {item.detail}
-                      </p>
-                    </div>
-                    <span className="inline-link" style={{ fontWeight: 600 }}>
-                      {t("common.viewDetails")} →
-                    </span>
-                  </Link>
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h3>{t("dashboard.heroTitle")}</h3>
+                <p>{t("dashboard.heroDescription")}</p>
+              </div>
+              <div className="overview-hero-grid">
+                {data.data.heroKpis.map((kpi) => (
+                  <HeroKpiCard key={kpi.id} kpi={kpi} />
                 ))}
               </div>
             </section>
 
-            <section style={{ display: "grid", gap: 10 }}>
-              <p className="language-switcher-label" style={{ margin: 0 }}>
-                {t("overview.secondaryMetrics")}
-              </p>
-              <div className="metrics-grid">
-                {secondaryMetrics.map((item) => (
-                  <MetricCard
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    {...(item.detail ? { detail: item.detail } : {})}
-                  />
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h3>{t("dashboard.attentionTitle")}</h3>
+                <p>{t("dashboard.attentionDescription")}</p>
+              </div>
+              <div className="dashboard-grid dashboard-grid-3">
+                {data.data.attentionItems.map((item) => (
+                  <AttentionCard key={item.id} item={item} />
                 ))}
               </div>
             </section>
 
-            <div className="panel">
-              <div className="panel-header">
-                <h3>{t("overview.recentActivityTitle")}</h3>
-                <Link to="/activity" className="inline-link">
-                  {t("common.viewDetails")} →
-                </Link>
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h3>{t("dashboard.roleSummaryTitle")}</h3>
+                <p>{t("dashboard.roleSummaryDescription")}</p>
               </div>
-              <div className="panel-content">
-                <div className="timeline-mini">
-                  {data.recentActivity.length === 0 ? (
-                    <p className="state-message">{t("activity.empty")}</p>
-                  ) : (
-                    data.recentActivity.map((event: any) => (
-                      <div key={event.id} className="timeline-mini-item">
-                        <span className={`signal-dot signal-${event.severity}`}></span>
-                        <span className="event-time-mini">
-                          {new Date(event.timestamp).toLocaleTimeString(language === "zh" ? "zh-CN" : "en-US", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        <span className="event-message-mini">{event.message}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
+              <div className="dashboard-grid dashboard-grid-4">
+                {data.data.roleEntries.map((entry) => (
+                  <RoleSummaryCard key={entry.id} entry={entry} />
+                ))}
               </div>
-            </div>
+            </section>
 
-            <section
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                gap: 16,
-              }}
-            >
-              <div className="panel">
+            <div className="dashboard-grid dashboard-grid-2">
+              <article className="panel">
                 <div className="panel-header">
-                  <h3>{t("overview.risksTitle")}</h3>
-                  <p>{t("overview.risksDescription")}</p>
+                  <div>
+                    <h3>{t("overview.recentActivityTitle")}</h3>
+                    <p>{t("dashboard.recentActivityDescription")}</p>
+                  </div>
+                  <Link to="/activity" className="inline-link">
+                    {t("common.viewDetails")} →
+                  </Link>
                 </div>
+                <div className="panel-content">{renderRecentActivity()}</div>
+              </article>
 
-                <div className="target-grid">
-                  {data.risksSummary.data.targetBreakdown.slice(0, 4).map((targetRisk: any) => (
-                    <Link key={targetRisk.targetId} className="target-card" to="/risks">
-                      <div className="target-card-header">
-                        <div>
-                          <div className="cell-title">{targetRisk.targetName}</div>
-                          <div className="cell-subtitle">{targetRisk.targetId}</div>
+              <article className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h3>{t("dashboard.riskSnapshotTitle")}</h3>
+                    <p>{t("dashboard.riskSnapshotDescription")}</p>
+                  </div>
+                </div>
+                <div className="dashboard-list">
+                  {data.data.topRisks.map((item) => (
+                    <Link key={item.targetId} className="dashboard-list-item dashboard-list-item-wide" to={item.to}>
+                      <div>
+                        <div className="cell-title">{item.targetName}</div>
+                        <div className="cell-subtitle">
+                          {item.openFindings} open findings • risk {item.highestScore}
                         </div>
-                        <span className="signal-badge signal-high">{targetRisk.highestScore}</span>
                       </div>
-                      <div className="target-card-meta">
-                        <span>{t("overview.metric.openFindings")}: {targetRisk.openFindings}</span>
-                        <span>{t("risks.table.severity")}: {targetRisk.highestSeverity ? translateSignal(targetRisk.highestSeverity) : "-"}</span>
-                      </div>
+                      <span className="signal-badge signal-high">{item.highestSeverity ?? "open"}</span>
                     </Link>
                   ))}
                 </div>
-              </div>
+              </article>
+            </div>
 
-              <div className="panel">
+            <div className="dashboard-grid dashboard-grid-2">
+              <article className="panel">
                 <div className="panel-header">
-                  <h3>{t("overview.targetsTitle")}</h3>
-                  <p>{t("overview.targetsDescription")}</p>
+                  <div>
+                    <h3>{t("dashboard.targetSnapshotTitle")}</h3>
+                    <p>{t("dashboard.targetSnapshotDescription")}</p>
+                  </div>
+                  <Link to="/targets" className="inline-link">
+                    {t("common.viewDetails")} →
+                  </Link>
                 </div>
-
-                <div className="target-grid">
-                  {data.targets.data.map((target: any) => (
-                    <Link key={target.id} className="target-card" to={`/targets/${target.id}`}>
-                      <div className="target-card-header">
-                        <div>
-                          <div className="cell-title">{target.name}</div>
-                          <div className="cell-subtitle">{target.id}</div>
+                <div className="dashboard-list">
+                  {data.data.targetSnapshot.map((target) => (
+                    <Link key={target.id} className="dashboard-list-item dashboard-list-item-wide" to={target.to}>
+                      <div>
+                        <div className="cell-title">{target.label}</div>
+                        <div className="cell-subtitle">
+                          {target.sourceKind} • {target.freshness} • {target.warningCount} warnings
                         </div>
-                        <StatusBadge status={target.status} />
                       </div>
-                      <div className="target-card-meta">
-                        <span>{translateTargetSourceKind(target.sourceKind)}</span>
-                        <span>{translateFreshness(target.freshness)}</span>
-                      </div>
-                      <div className="target-card-stats">
-                        <span>{t("targets.table.warnings")}: {target.warningCount}</span>
-                        <span>{t("targets.table.risk")}: {target.riskScore}</span>
-                      </div>
+                      <span className="signal-badge signal-medium">{target.riskScore}</span>
                     </Link>
                   ))}
                 </div>
-              </div>
-            </section>
+              </article>
 
-            <div className="panel">
-              <div className="panel-header">
-                <h3>{t("overview.coverageTitle")}</h3>
-                <p>{t("overview.coverageDescription")}</p>
-              </div>
-
-              <div className="target-grid">
-                <Link className="target-card" to="/coverage">
-                  <div className="target-card-header">
-                    <div>
-                      <div className="cell-title">{t("coverage.panelTitle")}</div>
-                      <div className="cell-subtitle">{data.coverage.data.collections.length}</div>
-                    </div>
-                    <CoverageBadge coverage={data.coverage.meta.coverage} />
+              <article className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h3>{t("dashboard.coverageSnapshotTitle")}</h3>
+                    <p>{t("dashboard.coverageSnapshotDescription")}</p>
                   </div>
-                  <div className="target-card-meta">
-                    <span>{t("coverage.metric.complete")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "complete").length}</span>
-                    <span>{t("coverage.metric.partial")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "partial").length}</span>
-                  </div>
-                  <div className="target-card-stats">
-                    <span>{t("coverage.metric.unavailable")}: {data.coverage.data.collections.filter((collection: any) => collection.coverage === "unavailable").length}</span>
-                    <span>{t("common.warnings")}: {data.coverage.data.collections.reduce((count: number, collection: any) => count + collection.warningCount, 0)}</span>
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-header">
-                <h3>{t("overview.drilldownTitle")}</h3>
-                <p>{t("overview.drilldownDescription")}</p>
-              </div>
-
-              <div className="drilldown-grid">
-                {drillDownItems.map((item) => (
-                  <Link key={item.to} className="drilldown-card" to={item.to}>
-                    <span className="drilldown-label">{item.label}</span>
-                    <span className="drilldown-count">{item.count}</span>
+                  <Link to={data.data.coverageHighlight.detailLink.to} className="inline-link">
+                    {t("common.viewDetails")} →
                   </Link>
-                ))}
-              </div>
+                </div>
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <p className="metric-label">Complete</p>
+                    <p className="metric-value">{data.data.coverageHighlight.complete}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="metric-label">Partial</p>
+                    <p className="metric-value">{data.data.coverageHighlight.partial}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="metric-label">Unavailable</p>
+                    <p className="metric-value">{data.data.coverageHighlight.unavailable}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="metric-label">{t("common.warnings")}</p>
+                    <p className="metric-value">{data.data.coverageHighlight.warnings}</p>
+                  </div>
+                </div>
+              </article>
             </div>
 
-            <RuntimeStatusCard runtime={data.runtimeStatus.data} />
+            <RuntimeStatusCard runtime={data.data.runtime} />
+            <SourceTracePanel trace={data.data.sourceTrace} />
 
-            <div className="panel">
-              <div className="panel-header">
-                <h3>{t("overview.runtimeStatusTitle")}</h3>
-                <p>{t("common.generatedAt", { time: formatTimestamp(data.summary.meta.generatedAt, language) })}</p>
-              </div>
-
-              <div className="table-wrap">
-                <table className="data-table density-comfortable">
-                  <thead>
-                    <tr>
-                      <th>{t("overview.table.component")}</th>
-                      <th>{t("overview.table.type")}</th>
-                      <th>{t("overview.table.status")}</th>
-                      <th>{t("overview.table.observed")}</th>
-                      <th>{t("overview.table.details")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.summary.runtimeStatuses.map((runtimeStatus: any) => (
-                      <tr key={runtimeStatus.componentId}>
-                        <td className="cell-mono">{runtimeStatus.componentId}</td>
-                        <td>{translateComponentType(runtimeStatus.componentType)}</td>
-                        <td>
-                          <StatusBadge status={runtimeStatus.status} />
-                        </td>
-                        <td>{formatTimestamp(runtimeStatus.observedAt, language)}</td>
-                        <td>
-                          {Object.entries(runtimeStatus.details)
-                            .map(([key, value]) => `${key}: ${String(value)}`)
-                            .join(" | ")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {data.data.heroKpis.some((item) => item.evidenceRefs.length > 0) ? (
+              <article className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h3>{t("dashboard.evidenceTitle")}</h3>
+                    <p>{t("dashboard.evidenceDescription")}</p>
+                  </div>
+                </div>
+                <div className="evidence-pill-row">
+                  {data.data.heroKpis.flatMap((item) => item.evidenceRefs).slice(0, 8).map((evidence) => (
+                    <EvidencePill key={evidence.id} evidence={evidence} />
+                  ))}
+                </div>
+              </article>
+            ) : null}
           </>
         ) : null}
       </DataState>

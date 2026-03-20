@@ -1,60 +1,41 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { RoleSwitcher } from "../components/role/role-switcher.js";
 import { RuntimeStatusBar } from "../components/runtime/runtime-status-bar.js";
 import { RuntimeSourceMarker } from "../components/runtime-source-marker.js";
 import { useI18n } from "../lib/i18n.js";
-
-interface NavItem {
-  to: string;
-  label: string;
-}
-
-function isNavPathActive(pathname: string, item: NavItem) {
-  return pathname === item.to || (item.to !== "/" && pathname.startsWith(`${item.to}/`));
-}
+import {
+  getRoleNavigationItem,
+  getStoredRoleId,
+  persistRoleId,
+  resolveRoleId,
+  type RoleId,
+} from "../lib/navigation/role-nav.js";
 
 export function ConsoleLayout() {
   const { language, setLanguage, t } = useI18n();
   const { pathname } = useLocation();
-
-  const primaryNavItems: NavItem[] = [
-    { to: "/", label: t("nav.overview") },
-    { to: "/fleet-map", label: t("nav.fleetMap") },
-    { to: "/activity", label: t("nav.activity") },
-    { to: "/risks", label: t("nav.risks") },
-    { to: "/findings", label: t("nav.findings") },
-    { to: "/recommendations", label: t("nav.recommendations") },
-  ];
-
-  const resourceNavItems: NavItem[] = [
-    { to: "/targets", label: t("nav.targets") },
-    { to: "/coverage", label: t("nav.coverage") },
-    { to: "/logs", label: t("nav.logs") },
-    { to: "/cron", label: t("nav.cron") },
-    { to: "/nodes", label: t("nav.nodes") },
-    { to: "/evidence", label: t("nav.evidence") },
-    { to: "/agents", label: t("nav.agents") },
-    { to: "/workspaces", label: t("nav.workspaces") },
-    { to: "/sessions", label: t("nav.sessions") },
-    { to: "/bindings", label: t("nav.bindings") },
-    { to: "/auth-profiles", label: t("nav.authProfiles") },
-    { to: "/topology", label: t("nav.topology") },
-  ];
-
-  const isResourceRoute = resourceNavItems.some((item) => isNavPathActive(pathname, item));
-  const [resourceDetailsExpanded, setResourceDetailsExpanded] = useState(isResourceRoute);
+  const [activeRoleId, setActiveRoleId] = useState<RoleId>(() => resolveRoleId(pathname, getStoredRoleId()));
 
   useEffect(() => {
-    if (isResourceRoute) {
-      setResourceDetailsExpanded(true);
-    }
-  }, [isResourceRoute, pathname]);
+    setActiveRoleId((currentRoleId) => resolveRoleId(pathname, currentRoleId));
+  }, [pathname]);
+
+  useEffect(() => {
+    persistRoleId(activeRoleId);
+  }, [activeRoleId]);
+
+  const activeRole = getRoleNavigationItem(activeRoleId) ?? getRoleNavigationItem("overview");
+
+  if (!activeRole) {
+    return null;
+  }
 
   return (
     <div className="app-shell">
       <aside className="sidebar fade-in-up" style={{ padding: 20, gap: 16 }}>
-        <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
+        <div style={{ display: "grid", gap: 14, flex: 1, alignContent: "start" }}>
           <div style={{ display: "grid", gap: 8 }}>
             <p className="product-eyebrow" style={{ fontSize: "0.68rem" }}>
               {t("product.eyebrow")}
@@ -76,6 +57,35 @@ export function ConsoleLayout() {
             >
               {t("layout.productSubtitleShort")}
             </p>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <p className="language-switcher-label" style={{ margin: 0 }}>
+              {t("nav.primary")}
+            </p>
+            <RoleSwitcher activeRoleId={activeRoleId} onSelectRole={setActiveRoleId} />
+          </div>
+
+          <div className="role-context-panel">
+            <div style={{ display: "grid", gap: 4 }}>
+              <p className="language-switcher-label" style={{ margin: 0 }}>
+                {t(activeRole.labelKey)}
+              </p>
+              <p className="role-context-copy">{t(activeRole.audienceKey)}</p>
+            </div>
+
+            <nav className="nav-list" aria-label={t(activeRole.labelKey)} style={{ gap: 6 }}>
+              {activeRole.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) => `nav-link${isActive ? " nav-link-active" : ""}`}
+                >
+                  {t(item.labelKey)}
+                </NavLink>
+              ))}
+            </nav>
           </div>
 
           <section
@@ -107,69 +117,6 @@ export function ConsoleLayout() {
               </div>
             </div>
           </section>
-
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "grid", gap: 6 }}>
-              <p className="language-switcher-label" style={{ margin: 0 }}>
-                {t("nav.primary")}
-              </p>
-              <nav className="nav-list" aria-label={t("nav.primary")} style={{ gap: 6 }}>
-                {primaryNavItems.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === "/"}
-                    className={({ isActive }) => `nav-link${isActive ? " nav-link-active" : ""}`}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </nav>
-            </div>
-
-            <div style={{ display: "grid", gap: 6 }}>
-              <button
-                type="button"
-                className={`nav-link${isResourceRoute ? " nav-link-active" : ""}`}
-                aria-expanded={resourceDetailsExpanded}
-                aria-controls="resource-details-nav"
-                onClick={() => setResourceDetailsExpanded((expanded) => !expanded)}
-                style={{
-                  width: "100%",
-                  background: isResourceRoute ? "var(--accent-soft)" : "transparent",
-                  borderColor: isResourceRoute ? "rgba(0, 109, 119, 0.35)" : "transparent",
-                  cursor: "pointer",
-                  font: "inherit",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  textAlign: "left",
-                }}
-              >
-                <span>{t("nav.resourceDetails")}</span>
-                <span aria-hidden="true">{resourceDetailsExpanded ? "−" : "+"}</span>
-              </button>
-
-              {resourceDetailsExpanded ? (
-                <nav
-                  id="resource-details-nav"
-                  className="nav-list"
-                  aria-label={t("nav.resourceDetails")}
-                  style={{ gap: 6, paddingLeft: 8 }}
-                >
-                  {resourceNavItems.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) => `nav-link${isActive ? " nav-link-active" : ""}`}
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </nav>
-              ) : null}
-            </div>
-          </div>
         </div>
 
         <div style={{ display: "grid", gap: 8 }}>

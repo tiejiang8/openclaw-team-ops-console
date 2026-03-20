@@ -9,3 +9,4 @@ export * from "./contracts/bootstrap.js";
 export * from "./contracts/fleet-map.js";
 export * from "./contracts/activity.js";
 export * from "./contracts/streaming.js";
+export * from "./contracts/dashboard.js";
