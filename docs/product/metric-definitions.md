@@ -2,6 +2,18 @@
 
 This document records the current v1 definitions for role-based dashboard metrics. These are intentionally pragmatic read-only roll-ups rather than canonical business reporting metrics.
 
+## Confidence levels
+
+- Exact-ish / inventory metrics
+  - Counts such as targets, nodes, cron jobs, open risks, and findings come directly from the current read-only snapshot or runtime plane.
+  - They are still snapshot-bound, but they are closer to direct inventory facts than proxy metrics.
+- Proxy metrics
+  - Metrics such as `activeUsersProxy`, `repeatUsageRatio`, and `multiDayActiveUsers` infer usage breadth from visible session metadata.
+  - They are useful for trend reading and rollout observation, not identity-accurate analytics.
+- Observational metrics
+  - Summaries such as average session duration, workspace heat, or early rollout signals may degrade to `0` or empty states when the supporting metadata is not visible enough.
+  - The UI now explicitly labels these cases as `proxy`, `early signal`, or `limited sample`.
+
 ## activeUsersProxy
 
 - Purpose: estimate whether usage is broadening without requiring a first-class user identity model.
@@ -64,6 +76,30 @@ This document records the current v1 definitions for role-based dashboard metric
   - A team that has at least one workspace with `2+` sessions in the 7-day window
 - Active team
   - A team with at least one workspace that had session activity in the last 7 days
+
+## How to read `0` and `unavailable`
+
+- `0`
+  - Means the current visible snapshot did not show that signal.
+  - For proxy metrics, `0` should be read as “not currently observed”, not “proven absent forever”.
+- `unavailable`
+  - Means the supporting metadata or source coverage was not sufficient to compute the metric credibly.
+  - The dashboard should prefer an explicit note or empty state over pretending the metric is complete.
+
+## Exact vs observational reading
+
+- Better treated as direct read-only facts
+  - target count
+  - node count
+  - cron overdue count
+  - open risks / findings
+  - config mismatch count
+- Better treated as observational or proxy
+  - activeUsersProxy
+  - repeatUsageRatio
+  - multiDayActiveUsers
+  - avgSessionDurationMinutes
+  - high-intensity workspace / team adoption signals
 
 ## Important caveats
 

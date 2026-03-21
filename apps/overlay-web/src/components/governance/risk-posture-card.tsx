@@ -1,29 +1,38 @@
 import type { RiskPostureSummary } from "@openclaw-team-ops/shared";
 
+import { useI18n } from "../../lib/i18n.js";
 import { MetricCard } from "../metric-card.js";
 
 export function RiskPostureCard({ posture }: { posture: RiskPostureSummary }) {
+  const { t, translateSignal, translateFindingType } = useI18n();
+
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
-          <h3>Risk posture</h3>
-          <p>{posture.summary}</p>
+          <h3>{t("governance.riskPostureTitle")}</h3>
+          <p>
+            {t("governance.riskPostureSummary", {
+              open: posture.openRisks,
+              mismatch: posture.configMismatchCount,
+              auth: posture.authCoverageGapCount,
+            })}
+          </p>
         </div>
       </div>
 
       <div className="dashboard-health-strip">
-        <MetricCard label="Open risks" value={posture.openRisks} />
-        <MetricCard label="Critical findings" value={posture.criticalFindings} />
-        <MetricCard label="Config mismatch" value={posture.configMismatchCount} />
-        <MetricCard label="Auth gaps" value={posture.authCoverageGapCount} />
+        <MetricCard label={t("governance.openRisks")} value={posture.openRisks} />
+        <MetricCard label={t("governance.criticalFindings")} value={posture.criticalFindings} />
+        <MetricCard label={t("governance.configMismatch")} value={posture.configMismatchCount} />
+        <MetricCard label={t("governance.authGaps")} value={posture.authCoverageGapCount} />
       </div>
 
       <div className="dashboard-split-grid">
         <div className="dashboard-list">
           {posture.severityBreakdown.map((item) => (
             <div key={item.severity} className="dashboard-list-item">
-              <span>{item.severity}</span>
+              <span>{translateSignal(item.severity)}</span>
               <span className="signal-badge signal-high">{item.count}</span>
             </div>
           ))}
@@ -31,7 +40,7 @@ export function RiskPostureCard({ posture }: { posture: RiskPostureSummary }) {
         <div className="dashboard-list">
           {posture.typeBreakdown.map((item) => (
             <div key={item.type} className="dashboard-list-item">
-              <span>{item.type}</span>
+              <span>{translateFindingType(item.type)}</span>
               <span className="signal-badge signal-medium">{item.count}</span>
             </div>
           ))}

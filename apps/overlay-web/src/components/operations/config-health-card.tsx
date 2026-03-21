@@ -5,13 +5,23 @@ import { DrilldownLink } from "../evidence/drilldown-link.js";
 
 export function ConfigHealthCard({ configHealth }: { configHealth: ConfigHealthSummary }) {
   const { t } = useI18n();
+  const issues = [
+    configHealth.mismatchCount > 0 ? t("operations.configMismatch") : null,
+    configHealth.authCoverageGapCount > 0 ? t("operations.authGaps") : null,
+    configHealth.staleTargets > 0 ? t("operations.staleTargets") : null,
+    configHealth.coverageGapCount > 0 ? t("operations.coverageGaps") : null,
+  ].filter((item): item is string => Boolean(item));
+  const summary =
+    issues.length > 0
+      ? t("operations.configHealthIssues", { issues: issues.join(" / ") })
+      : t("operations.configHealthHealthy");
 
   return (
     <article className="panel">
       <div className="panel-header">
         <div>
           <h3>{t("operations.configHealthTitle")}</h3>
-          <p>{configHealth.summary}</p>
+          <p>{summary}</p>
         </div>
       </div>
 

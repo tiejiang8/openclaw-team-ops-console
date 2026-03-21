@@ -1,6 +1,7 @@
 import type { OpsIncidentHotspot } from "@openclaw-team-ops/shared";
 
 import { useI18n } from "../../lib/i18n.js";
+import { EmptyPanel } from "../state/empty-panel.js";
 
 function hotspotTypeLabel(type: OpsIncidentHotspot["type"], t: ReturnType<typeof useI18n>["t"]) {
   switch (type) {
@@ -29,17 +30,24 @@ export function ExceptionBreakdownCard({ hotspots }: { hotspots: OpsIncidentHots
         </div>
       </div>
 
-      <div className="dashboard-list">
-        {hotspots.map((hotspot) => (
-          <div key={hotspot.id} className="dashboard-list-item">
-            <div>
-              <div className="cell-title">{hotspot.label}</div>
-              <div className="cell-subtitle">{hotspotTypeLabel(hotspot.type, t)}</div>
+      {hotspots.length > 0 ? (
+        <div className="dashboard-list">
+          {hotspots.map((hotspot) => (
+            <div key={hotspot.id} className="dashboard-list-item">
+              <div>
+                <div className="cell-title">{hotspot.label}</div>
+                <div className="cell-subtitle">{hotspotTypeLabel(hotspot.type, t)}</div>
+              </div>
+              <span className="signal-badge signal-high">{hotspot.count}</span>
             </div>
-            <span className="signal-badge signal-high">{hotspot.count}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyPanel
+          title={t("operations.exceptionEmptyTitle")}
+          message={t("operations.exceptionEmptyDescription")}
+        />
+      )}
     </article>
   );
 }

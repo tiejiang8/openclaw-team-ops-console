@@ -40,6 +40,11 @@ export function AdoptionPage() {
           <>
             <AdoptionKpiStrip dashboard={data.data} />
 
+            <div className="state-box state-box-warning panel-inline-note">
+              <p className="state-title">{t("adoption.methodologyTitle")}</p>
+              <p className="state-message">{t("adoption.methodologyDescription")}</p>
+            </div>
+
             <div className="dashboard-grid dashboard-grid-2">
               <UsageTrendCard points={data.data.trendPoints} />
               <UsageHeatmapCard buckets={data.data.hourlyHeatmap} />

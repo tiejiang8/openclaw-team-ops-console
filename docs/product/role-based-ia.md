@@ -2,6 +2,8 @@
 
 OpenClaw Team Ops Console now leads with role-oriented workbenches instead of a flat resource-first menu.
 
+The current v0.3 emphasis is not “more KPI density”. It is credibility tightening: clearer empty states, proxy labeling, and more consistent role-language across Overview, Operations, Adoption, Outcomes, Governance, and Evidence.
+
 ## Primary role views
 
 - `Overview` (`/`)
@@ -53,5 +55,7 @@ The original read-only routes stay intact and are now grouped under the role len
 
 - Keep the product read-only. No role page introduces write-back, execution, or remediation actions.
 - Let the dashboard answer “what needs attention?” before the user opens a raw inventory page.
+- Prefer explicit explanatory empty states over silent blank panels when a chart or ranking has no meaningful signal yet.
+- Mark proxy, early-signal, and limited-sample metrics clearly so the UI does not over-claim what the current data can support.
 - Every major dashboard card must retain a path back to existing detail pages or evidence records.
 - Preserve old routes so existing links, docs, and habits do not break while the IA evolves.

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { AttentionCard } from "../components/dashboard/attention-card.js";
 import { HeroKpiCard } from "../components/dashboard/hero-kpi-card.js";
 import { RoleSummaryCard } from "../components/dashboard/role-summary-card.js";
+import { SectionCollapse } from "../components/dashboard/section-collapse.js";
 import { DataState } from "../components/data-state.js";
 import { PageObservability } from "../components/page-observability.js";
 import { useStreamRefresh } from "../components/streaming-provider.js";
@@ -18,7 +19,7 @@ import { useRefreshPreferences } from "../lib/refresh-preferences.js";
 import { useResource } from "../lib/use-resource.js";
 
 export function OverviewPage() {
-  const { language, t } = useI18n();
+  const { language, t, translateTargetSourceKind, translateFreshness, translateSignal } = useI18n();
   const { intervalMs, autoRefreshEnabled } = useRefreshPreferences();
 
   const { data, loading, error, retry } = useResource(
@@ -43,6 +44,11 @@ export function OverviewPage() {
   });
 
   const isEmpty = !loading && !error && (data?.data.heroKpis.length ?? 0) === 0;
+  const bootstrapSummary = bootstrapData?.data
+    ? bootstrapData.data.operatorReadReady
+      ? t("dashboard.directChecksReady")
+      : t("dashboard.directChecksNeedsReview")
+    : t("dashboard.directChecksDescription");
 
   const renderRecentActivity = useCallback(() => {
     if (!data?.data.recentActivity.length) {
@@ -83,8 +89,6 @@ export function OverviewPage() {
       >
         {data ? (
           <>
-            {bootstrapData?.data ? <ConnectionChecklist status={bootstrapData.data as never} /> : null}
-
             <section className="dashboard-section">
               <div className="section-heading">
                 <h3>{t("dashboard.heroTitle")}</h3>
@@ -121,6 +125,15 @@ export function OverviewPage() {
               </div>
             </section>
 
+            {bootstrapData?.data ? (
+              <SectionCollapse
+                title={t("dashboard.directChecksTitle")}
+                description={bootstrapSummary}
+              >
+                <ConnectionChecklist status={bootstrapData.data as never} />
+              </SectionCollapse>
+            ) : null}
+
             <div className="dashboard-grid dashboard-grid-2">
               <article className="panel">
                 <div className="panel-header">
@@ -148,10 +161,13 @@ export function OverviewPage() {
                       <div>
                         <div className="cell-title">{item.targetName}</div>
                         <div className="cell-subtitle">
-                          {item.openFindings} open findings • risk {item.highestScore}
+                          {t("dashboard.openFindingsCount", { count: item.openFindings })} •{" "}
+                          {t("dashboard.riskScore", { score: item.highestScore })}
                         </div>
                       </div>
-                      <span className="signal-badge signal-high">{item.highestSeverity ?? "open"}</span>
+                      <span className="signal-badge signal-high">
+                        {item.highestSeverity ? translateSignal(item.highestSeverity) : t("common.latest")}
+                      </span>
                     </Link>
                   ))}
                 </div>
@@ -175,7 +191,8 @@ export function OverviewPage() {
                       <div>
                         <div className="cell-title">{target.label}</div>
                         <div className="cell-subtitle">
-                          {target.sourceKind} • {target.freshness} • {target.warningCount} warnings
+                          {translateTargetSourceKind(target.sourceKind)} • {translateFreshness(target.freshness)} •{" "}
+                          {t("dashboard.warningCount", { count: target.warningCount })}
                         </div>
                       </div>
                       <span className="signal-badge signal-medium">{target.riskScore}</span>
@@ -196,15 +213,15 @@ export function OverviewPage() {
                 </div>
                 <div className="metrics-grid">
                   <div className="metric-card">
-                    <p className="metric-label">Complete</p>
+                    <p className="metric-label">{t("coverage.metric.complete")}</p>
                     <p className="metric-value">{data.data.coverageHighlight.complete}</p>
                   </div>
                   <div className="metric-card">
-                    <p className="metric-label">Partial</p>
+                    <p className="metric-label">{t("coverage.metric.partial")}</p>
                     <p className="metric-value">{data.data.coverageHighlight.partial}</p>
                   </div>
                   <div className="metric-card">
-                    <p className="metric-label">Unavailable</p>
+                    <p className="metric-label">{t("coverage.metric.unavailable")}</p>
                     <p className="metric-value">{data.data.coverageHighlight.unavailable}</p>
                   </div>
                   <div className="metric-card">

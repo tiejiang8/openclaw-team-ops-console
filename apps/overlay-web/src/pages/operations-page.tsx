@@ -8,6 +8,7 @@ import { HotspotsCard } from "../components/operations/hotspots-card.js";
 import { OpsHealthStrip } from "../components/operations/ops-health-strip.js";
 import { PageObservability } from "../components/page-observability.js";
 import { DrilldownLink } from "../components/evidence/drilldown-link.js";
+import { EmptyPanel } from "../components/state/empty-panel.js";
 import { overlayApi } from "../lib/api.js";
 import { useI18n } from "../lib/i18n.js";
 import { useRefreshPreferences } from "../lib/refresh-preferences.js";
@@ -26,6 +27,25 @@ export function OperationsPage() {
       errorBackoffMs: 60_000,
     },
   );
+  const hasRecentCronFailure = Boolean(
+    data?.data.recentActivity.some(
+      (event) =>
+        event.type === "cron" &&
+        (event.severity === "warn" || event.severity === "error" || event.severity === "critical") &&
+        /fail|overdue/i.test(event.message),
+    ),
+  );
+  const activitySummary = data
+    ? data.data.errors24h > 0
+      ? t("operations.activitySummary.errors", { count: data.data.errors24h })
+      : data.data.staleNodes > 0
+        ? t("operations.activitySummary.stale", { count: data.data.staleNodes })
+        : data.data.overdueCron > 0
+          ? t("operations.activitySummary.cron", { count: data.data.overdueCron })
+          : hasRecentCronFailure
+            ? t("operations.activitySummary.cronFailure")
+            : t("operations.activitySummary.healthy")
+    : "";
 
   return (
     <section className="page fade-in-up">
@@ -61,17 +81,24 @@ export function OperationsPage() {
               <div className="panel-header">
                 <div>
                   <h3>{t("overview.recentActivityTitle")}</h3>
-                  <p>{data.data.impactSummary}</p>
+                  <p>{activitySummary}</p>
                 </div>
               </div>
-              <div className="timeline-mini">
-                {data.data.recentActivity.map((event) => (
-                  <div key={event.id} className="timeline-mini-item">
-                    <span className={`signal-dot signal-${event.severity}`}></span>
-                    <span className="event-message-mini">{event.message}</span>
-                  </div>
-                ))}
-              </div>
+              {data.data.recentActivity.length > 0 ? (
+                <div className="timeline-mini">
+                  {data.data.recentActivity.map((event) => (
+                    <div key={event.id} className="timeline-mini-item">
+                      <span className={`signal-dot signal-${event.severity}`}></span>
+                      <span className="event-message-mini">{event.message}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyPanel
+                  title={t("operations.activityEmptyTitle")}
+                  message={t("operations.activityEmptyDescription")}
+                />
+              )}
             </article>
 
             <article className="panel">

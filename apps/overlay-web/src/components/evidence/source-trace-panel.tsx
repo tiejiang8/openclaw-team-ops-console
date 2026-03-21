@@ -4,7 +4,7 @@ import { useI18n } from "../../lib/i18n.js";
 import { formatTimestamp } from "../../lib/format.js";
 
 export function SourceTracePanel({ trace }: { trace: SourceTraceSummary }) {
-  const { language, t } = useI18n();
+  const { language, t, translateTargetSourceKind } = useI18n();
 
   return (
     <article className="panel source-trace-panel">
@@ -33,7 +33,7 @@ export function SourceTracePanel({ trace }: { trace: SourceTraceSummary }) {
           <div className="source-trace-pills">
             {trace.sourceKinds.map((kind) => (
               <span key={kind} className="meta-chip">
-                {kind}
+                {translateTargetSourceKind(kind)}
               </span>
             ))}
           </div>

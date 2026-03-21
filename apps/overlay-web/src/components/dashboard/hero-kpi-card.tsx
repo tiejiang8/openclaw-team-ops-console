@@ -5,6 +5,42 @@ import { DrilldownLink } from "../evidence/drilldown-link.js";
 import { EvidencePill } from "../evidence/evidence-pill.js";
 import { TrendChip } from "./trend-chip.js";
 
+function translateHeroLabel(id: ExecutiveKpiGroup["id"], t: ReturnType<typeof useI18n>["t"], fallback: string) {
+  switch (id) {
+    case "stability":
+    case "adoption":
+    case "outcome":
+    case "risk":
+      return t(`dashboard.heroLabel.${id}`);
+    default:
+      return fallback;
+  }
+}
+
+function translateHeroTrend(id: ExecutiveKpiGroup["id"], t: ReturnType<typeof useI18n>["t"], fallback?: string) {
+  switch (id) {
+    case "stability":
+    case "adoption":
+    case "outcome":
+    case "risk":
+      return t(`dashboard.heroTrend.${id}`);
+    default:
+      return fallback;
+  }
+}
+
+function translateHeroSummary(id: ExecutiveKpiGroup["id"], t: ReturnType<typeof useI18n>["t"], fallback: string) {
+  switch (id) {
+    case "stability":
+    case "adoption":
+    case "outcome":
+    case "risk":
+      return t(`dashboard.heroSummary.${id}`);
+    default:
+      return fallback;
+  }
+}
+
 export function HeroKpiCard({ kpi }: { kpi: ExecutiveKpiGroup }) {
   const { t } = useI18n();
   const visibleEvidence = kpi.evidenceRefs.slice(0, 2);
@@ -14,13 +50,15 @@ export function HeroKpiCard({ kpi }: { kpi: ExecutiveKpiGroup }) {
     <article className={`dashboard-hero-card dashboard-signal-${kpi.signal}`}>
       <div className="dashboard-card-header">
         <div>
-          <p className="metric-label">{kpi.label}</p>
+          <p className="metric-label">{translateHeroLabel(kpi.id, t, kpi.label)}</p>
           <p className="dashboard-hero-value">{kpi.value}</p>
         </div>
-        <TrendChip label={kpi.trendLabel} signal={kpi.signal} />
+        <TrendChip label={translateHeroTrend(kpi.id, t, kpi.trendLabel)} signal={kpi.signal} />
       </div>
 
-      <p className="dashboard-summary dashboard-summary-clamped">{kpi.summary}</p>
+      <p className="dashboard-summary dashboard-summary-clamped">
+        {translateHeroSummary(kpi.id, t, kpi.summary)}
+      </p>
 
       <div className="dashboard-card-actions dashboard-card-actions-hero">
         <DrilldownLink link={kpi.detailLink} tone="accent" />

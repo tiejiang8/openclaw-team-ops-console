@@ -505,6 +505,12 @@ export class DashboardService {
     const context = await this.collectContext(10);
     const healthScore = this.computeHealthScore(context);
     const hotspots = this.buildHotspots(context);
+    const hasRecentCronFailure = context.activity.data.some(
+      (event) =>
+        event.type === "cron" &&
+        (event.severity === "warn" || event.severity === "error" || event.severity === "critical") &&
+        /fail|overdue/i.test(event.message),
+    );
     const configHealthItems = [
       context.configMismatchCount > 0 ? formatCountLabel(context.configMismatchCount, "config mismatch", "config mismatches") : null,
       context.authGapCount > 0 ? formatCountLabel(context.authGapCount, "auth gap", "auth gaps") : null,
@@ -522,10 +528,12 @@ export class DashboardService {
     const impactSummary =
       context.runtime.data.nodes.stale > 0
         ? `${formatCountLabel(context.runtime.data.nodes.stale, "stale node", "stale nodes")} are likely degrading cron execution and runtime freshness.`
-        : context.runtime.data.cron.overdue > 0
+      : context.runtime.data.cron.overdue > 0
           ? `${formatCountLabel(context.runtime.data.cron.overdue, "overdue cron job", "overdue cron jobs")} are the main remaining runtime drag.`
           : context.errors24h > 0
             ? `${formatCountLabel(context.errors24h, "log error", "log errors")} were observed in the last 24 hours, even though no stale nodes or overdue cron jobs were detected.`
+            : hasRecentCronFailure
+              ? "No new log-error spikes were observed, but recent activity still includes cron failure signals that deserve follow-up."
             : "No stale nodes or overdue cron jobs were detected in this pass.";
 
     const data: OperationsDashboard = {
@@ -593,7 +601,10 @@ export class DashboardService {
       retention: {
         repeatUsageRatio: this.computeRepeatUsageRatio(context.sessions, context.now),
         multiDayActiveUsers: context.multiDayActiveUsers,
-        summary: `${context.multiDayActiveUsers} proxy users were active on multiple days this week, while ${context.lowActivityTeams.join(", ") || "no teams"} are still low-activity.`,
+        summary:
+          context.multiDayActiveUsers > 0
+            ? `${context.multiDayActiveUsers} proxy users were active on multiple days this week, while ${context.lowActivityTeams.join(", ") || "no teams"} remain low-activity.`
+            : "No multi-day proxy usage is visible in the current session metadata yet, so retention should be treated as an early proxy signal.",
         lowActivityTeams: context.lowActivityTeams,
       },
       quickLinks: [
@@ -613,26 +624,37 @@ export class DashboardService {
     const context = await this.collectContext(8);
     const teamCoverage = this.buildTeamCoverage(context);
     const repeatUsageRatio = this.computeRepeatUsageRatio(context.sessions, context.now);
+    const sampleLimited = context.activeTeams < 2 || context.repeatedUsageTeams === 0;
+    const coarseAttribution = teamCoverage.every((team) => team.team === "Unassigned team");
 
     const data: OutcomesDashboard = {
       activeTeams: context.activeTeams,
       repeatedUsageTeams: context.repeatedUsageTeams,
       highIntensityWorkspaces: context.highIntensityWorkspaces,
       biggestBlocker: context.biggestBlocker,
-      executiveSummary: `${context.activeTeams} teams are active, but ${context.biggestBlocker.toLowerCase()} is still the largest blocker before wider rollout.`,
+      executiveSummary:
+        context.activeTeams === 0
+          ? `The rollout is still in an early stage, and ${context.biggestBlocker.toLowerCase()} is the clearest blocker before stronger outcome claims.`
+          : sampleLimited
+            ? `${context.activeTeams} teams show early rollout activity, but the sample is still limited and ${context.biggestBlocker.toLowerCase()} remains the main blocker.`
+            : `${context.activeTeams} teams are showing rollout traction, but ${context.biggestBlocker.toLowerCase()} is still the largest blocker before broader promotion.`,
       teamCoverage,
       valueSignals: [
         {
           label: "Repeat usage ratio",
           value: `${repeatUsageRatio}%`,
-          summary: `${context.repeatedUsageTeams} teams are already forming repeated usage habits.`,
+          summary: sampleLimited
+            ? `${context.repeatedUsageTeams} teams show repeat usage so far, but this should still be read as an early signal.`
+            : `${context.repeatedUsageTeams} teams are already forming repeated usage habits.`,
           signal: repeatUsageRatio >= 55 ? "healthy" : repeatUsageRatio >= 30 ? "attention" : "neutral",
           detailLink: buildLink("View details", "/adoption"),
         },
         {
           label: "High-intensity workspaces",
           value: context.highIntensityWorkspaces,
-          summary: `${context.highIntensityWorkspaces} workspaces show sustained session depth.`,
+          summary: context.highIntensityWorkspaces > 0
+            ? `${context.highIntensityWorkspaces} workspaces show deeper usage patterns, but the sample should still be treated cautiously.`
+            : "No stable high-intensity workspace cluster is visible yet.",
           signal: context.highIntensityWorkspaces > 0 ? "healthy" : "attention",
           detailLink: buildLink("View details", "/workspaces"),
         },

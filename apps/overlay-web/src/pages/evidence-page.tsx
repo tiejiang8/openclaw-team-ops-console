@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { DataState } from "../components/data-state.js";
+import { EvidenceImpactBadge } from "../components/evidence/evidence-impact-badge.js";
 import { MetricCard } from "../components/metric-card.js";
 import { PageObservability } from "../components/page-observability.js";
 import { SignalBadge } from "../components/signal-badge.js";
@@ -25,6 +26,79 @@ interface EvidenceRow {
   subjectLabel: string;
   freshness: string;
   observedAt: string;
+}
+
+function subjectLinkFor(subjectType: string, subjectId: string): string | null {
+  switch (subjectType) {
+    case "workspace":
+      return "/workspaces";
+    case "agent":
+      return "/agents";
+    case "session":
+      return "/sessions";
+    case "binding":
+      return "/bindings";
+    case "auth-profile":
+      return "/auth-profiles";
+    case "node":
+      return "/nodes";
+    case "cron-job":
+      return `/cron/${encodeURIComponent(subjectId)}`;
+    default:
+      return null;
+  }
+}
+
+function bridgeForEvidence(row: EvidenceRow) {
+  if (row.kind === "runtime-health" || row.freshness === "stale" || row.subjectType === "node") {
+    return {
+      impact: "high" as const,
+      role: "operations" as const,
+      actionKey: "evidenceBridge.action.operations",
+    };
+  }
+
+  if (row.subjectType === "workspace" || row.subjectType === "agent" || row.kind === "session-store") {
+    return {
+      impact: "medium" as const,
+      role: "adoption" as const,
+      actionKey: "evidenceBridge.action.adoption",
+    };
+  }
+
+  return {
+    impact: row.severity === "error" ? ("high" as const) : ("medium" as const),
+    role: "governance" as const,
+    actionKey: "evidenceBridge.action.governance",
+  };
+}
+
+function localizeEvidenceMessage(message: string, language: "en" | "zh"): string {
+  if (language !== "zh") {
+    return message;
+  }
+
+  const sessionWorkspace = /^Session (.+) has a missing workspace condition\.$/.exec(message);
+  if (sessionWorkspace) {
+    return `会话 ${sessionWorkspace[1]} 缺少工作区关联条件。`;
+  }
+
+  const sessionAgent = /^Session (.+) has a missing agent condition\.$/.exec(message);
+  if (sessionAgent) {
+    return `会话 ${sessionAgent[1]} 缺少智能体关联条件。`;
+  }
+
+  const bindingAgent = /^Binding (.+) has a missing agent condition\.$/.exec(message);
+  if (bindingAgent) {
+    return `绑定 ${bindingAgent[1]} 缺少智能体关联条件。`;
+  }
+
+  const bindingWorkspace = /^Binding (.+) has a missing workspace condition\.$/.exec(message);
+  if (bindingWorkspace) {
+    return `绑定 ${bindingWorkspace[1]} 缺少工作区关联条件。`;
+  }
+
+  return message;
 }
 
 function severityOrder(value: string): number {
@@ -159,6 +233,11 @@ export function EvidencePage() {
               <MetricCard label={t("freshness.stale")} value={rows.filter((row) => row.freshness === "stale").length} />
             </div>
 
+            <div className="state-box state-box-warning panel-inline-note">
+              <p className="state-title">{t("evidence.bridgeTitle")}</p>
+              <p className="state-message">{t("evidence.bridgeDescription")}</p>
+            </div>
+
             <TableToolbar density={tableState.density} setDensity={tableState.setDensity}>
               <input
                 className="filter-input"
@@ -235,37 +314,56 @@ export function EvidencePage() {
                       <SortableHeader column="severity" label={t("evidence.table.severity")} sortBy={tableState.sortBy} sortDirection={tableState.sortDirection} onSort={tableState.setSort} />
                       <SortableHeader column="target" label={t("evidence.table.target")} sortBy={tableState.sortBy} sortDirection={tableState.sortDirection} onSort={tableState.setSort} />
                       <SortableHeader column="subject" label={t("evidence.table.subject")} sortBy={tableState.sortBy} sortDirection={tableState.sortDirection} onSort={tableState.setSort} />
+                      <th>{t("evidence.table.impact")}</th>
                       <SortableHeader column="freshness" label={t("evidence.table.freshness")} sortBy={tableState.sortBy} sortDirection={tableState.sortDirection} onSort={tableState.setSort} />
                       <SortableHeader column="observedAt" label={t("evidence.table.observed")} sortBy={tableState.sortBy} sortDirection={tableState.sortDirection} onSort={tableState.setSort} />
                     </tr>
                   </thead>
                   <tbody>
-                    {paginated.pageItems.map((evidence) => (
-                      <tr key={evidence.id}>
-                        <td>
-                          <Link to={`/evidence/${evidence.id}`} className="inline-link">
-                            <div className="cell-title">{evidence.message}</div>
-                          </Link>
-                          <div className="cell-subtitle">{evidence.id}</div>
-                        </td>
-                        <td>{translateEvidenceKind(evidence.kind)}</td>
-                        <td>
-                          <SignalBadge value={evidence.severity} />
-                        </td>
-                        <td>
-                          <div className="cell-title">{evidence.targetName}</div>
-                          <div className="cell-subtitle">{evidence.targetId}</div>
-                        </td>
-                        <td>
-                          <div className="cell-title">{evidence.subjectLabel}</div>
-                          <div className="cell-subtitle">
-                            {translateEvidenceSubjectType(evidence.subjectType)} · {evidence.subjectId}
-                          </div>
-                        </td>
-                        <td>{translateFreshness(evidence.freshness)}</td>
-                        <td>{formatTimestamp(evidence.observedAt, language)}</td>
-                      </tr>
-                    ))}
+                    {paginated.pageItems.map((evidence) => {
+                      const bridge = bridgeForEvidence(evidence);
+                      const targetLink = `/targets/${encodeURIComponent(evidence.targetId)}`;
+                      const subjectLink = subjectLinkFor(evidence.subjectType, evidence.subjectId);
+
+                      return (
+                        <tr key={evidence.id}>
+                          <td>
+                            <Link to={`/evidence/${evidence.id}`} className="inline-link">
+                              <div className="cell-title">{localizeEvidenceMessage(evidence.message, language)}</div>
+                            </Link>
+                            <div className="cell-subtitle">{evidence.id}</div>
+                          </td>
+                          <td>{translateEvidenceKind(evidence.kind)}</td>
+                          <td>
+                            <SignalBadge value={evidence.severity} />
+                          </td>
+                          <td>
+                            <Link to={targetLink} className="inline-link">
+                              <div className="cell-title">{evidence.targetName}</div>
+                            </Link>
+                            <div className="cell-subtitle">{evidence.targetId}</div>
+                          </td>
+                          <td>
+                            {subjectLink ? (
+                              <Link to={subjectLink} className="inline-link">
+                                <div className="cell-title">{evidence.subjectLabel}</div>
+                              </Link>
+                            ) : (
+                              <div className="cell-title">{evidence.subjectLabel}</div>
+                            )}
+                            <div className="cell-subtitle">
+                              {translateEvidenceSubjectType(evidence.subjectType)} · {evidence.subjectId}
+                            </div>
+                          </td>
+                          <td>
+                            <EvidenceImpactBadge impact={bridge.impact} role={bridge.role} />
+                            <div className="cell-subtitle">{t(bridge.actionKey)}</div>
+                          </td>
+                          <td>{translateFreshness(evidence.freshness)}</td>
+                          <td>{formatTimestamp(evidence.observedAt, language)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
