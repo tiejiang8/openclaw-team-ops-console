@@ -118,6 +118,21 @@ const messages: Record<LanguageCode, Messages> = {
     "adoption.kpi.dayDelta": "{{value}} vs yesterday",
     "adoption.kpi.weekDelta": "{{value}} vs last week",
     "adoption.kpi.activeWorkspacesDetail": "{{count}} active workspaces",
+    "adoption.sampleWindow.activeUsersProxy": "Last 24 hours",
+    "adoption.sampleWindow.sessionsToday": "Current calendar day",
+    "adoption.sampleWindow.turnsToday": "Current calendar day",
+    "adoption.sampleWindow.avgDuration": "Visible sessions in the current snapshot",
+    "adoption.sampleWindow.retention": "Last 7 days",
+    "adoption.caveat.activeUsersProxy":
+      "Visible session metadata can still collapse multiple humans into one proxy or split one human across several proxies.",
+    "adoption.caveat.sessionsToday":
+      "This is still bounded by the latest read-only snapshot and can under-count activity that has not been collected yet.",
+    "adoption.caveat.turnsToday":
+      "Turns depend on visible message metadata and can remain low when transcript-level detail is unavailable.",
+    "adoption.caveat.avgDuration":
+      "Duration is estimated from visible timestamps only and should be read as a rough depth signal rather than a precise utilization fact.",
+    "adoption.caveat.retention":
+      "Repeat usage can look weaker than reality when workspace, agent, or channel attribution is incomplete.",
     "adoption.usageTrendTitle": "Usage trend",
     "adoption.usageTrendDescription": "Daily usage proxy for the latest seven days.",
     "adoption.usageHeatmapTitle": "Usage heatmap",
@@ -145,6 +160,31 @@ const messages: Record<LanguageCode, Messages> = {
     "adoption.methodologyTitle": "How to read this page",
     "adoption.methodologyDescription":
       "This is a usage proxy dashboard built from visible session metadata. Some counts are observational only and should be used for trend reading, not precise billing or user analytics.",
+    "adoption.definitionsTitle": "How these metrics are calculated",
+    "adoption.definitionsDescription":
+      "Use these quick definitions before treating an adoption roll-up as a business fact. They mirror the current read-only metric definitions used by the console.",
+    "adoption.definition.formulaLabel": "Formula",
+    "adoption.definition.readAsLabel": "Read as",
+    "adoption.definition.activeUsersProxy.formula":
+      "Count unique workspaceId, else agentId, else bindingId, else channel across sessions active in the last 24 hours.",
+    "adoption.definition.activeUsersProxy.readAs":
+      "A breadth proxy for visible usage, not a canonical people count.",
+    "adoption.definition.sessionsToday.formula":
+      "Count sessions with visible activity timestamps during the current calendar day from the latest read-only snapshot.",
+    "adoption.definition.sessionsToday.readAs":
+      "A snapshot-bound session count that is better for operational trend reading than for business reporting.",
+    "adoption.definition.turnsToday.formula":
+      "Sum visible session message counts for sessions active during the current calendar day.",
+    "adoption.definition.turnsToday.readAs":
+      "An observational interaction-volume signal that may undercount when transcripts or message totals are incomplete.",
+    "adoption.definition.avgDuration.formula":
+      "Average startedAt to lastActivityAt duration for visible sessions, with invalid or missing timestamps treated conservatively.",
+    "adoption.definition.avgDuration.readAs":
+      "A rough session-depth indicator rather than a contractual SLA or labor-efficiency fact.",
+    "adoption.definition.retention.formula":
+      "Look across the last 7 days, group visible activity by workspace, else agent, else channel, and measure repeated groups plus multi-day active proxies.",
+    "adoption.definition.retention.readAs":
+      "A repeat-usage trend signal, not a billing-grade retention metric.",
     "adoption.emptyTrendTitle": "No stable usage trend is visible yet",
     "adoption.emptyTrendDescription":
       "Visible session metadata is too sparse in this window to form a reliable short-term trend line.",
@@ -939,8 +979,19 @@ const messages: Record<LanguageCode, Messages> = {
     "subjectType.collection": "Collection",
     "subjectType.topology-edge": "Topology Edge",
     "metricConfidence.proxy": "Proxy",
+    "metricConfidence.observational": "Observational",
+    "metricConfidence.snapshot": "Snapshot fact",
     "metricConfidence.limited": "Limited sample",
     "metricConfidence.early": "Early signal",
+    "metricTrust.confidence": "Confidence",
+    "metricTrust.coverage": "Coverage",
+    "metricTrust.sampleWindow": "Sample window",
+    "metricTrust.degradeReason": "Degrade reason:",
+    "metricTrust.openDefinition": "How it's calculated",
+    "metricTrust.sourceCoverage": "Source coverage is currently {{value}}.",
+    "metricTrust.stale": "The latest snapshot is stale.",
+    "metricTrust.warnings": "{{count}} source warnings are active.",
+    "metricTrust.none": "No active source degrade signal is present in this snapshot.",
     "evidenceBridge.impact.high": "High impact",
     "evidenceBridge.impact.medium": "Medium impact",
     "evidenceBridge.impact.low": "Low impact",
@@ -1062,6 +1113,21 @@ const messages: Record<LanguageCode, Messages> = {
     "adoption.kpi.dayDelta": "较昨日 {{value}}",
     "adoption.kpi.weekDelta": "较上周 {{value}}",
     "adoption.kpi.activeWorkspacesDetail": "{{count}} 个活跃工作区",
+    "adoption.sampleWindow.activeUsersProxy": "最近 24 小时",
+    "adoption.sampleWindow.sessionsToday": "当前自然日",
+    "adoption.sampleWindow.turnsToday": "当前自然日",
+    "adoption.sampleWindow.avgDuration": "当前快照内可见会话",
+    "adoption.sampleWindow.retention": "最近 7 天",
+    "adoption.caveat.activeUsersProxy":
+      "可见 session 元数据仍可能把多个真实用户压成一个 proxy，或把同一人拆成多个 proxy。",
+    "adoption.caveat.sessionsToday":
+      "它仍然受最新只读快照约束；尚未被采集到的活动会让这个数字偏低。",
+    "adoption.caveat.turnsToday":
+      "轮次依赖可见消息元数据；当 transcript 或 message total 不完整时，这个数字会偏低。",
+    "adoption.caveat.avgDuration":
+      "平均时长只按当前可见时间戳估算，更适合看会话深度趋势，不适合当作精确利用率事实。",
+    "adoption.caveat.retention":
+      "若工作区、智能体或通道归因不完整，重复使用看起来会比真实情况更弱。",
     "adoption.usageTrendTitle": "使用趋势",
     "adoption.usageTrendDescription": "最近七天的日度使用 proxy。",
     "adoption.usageHeatmapTitle": "使用热力图",
@@ -1089,6 +1155,31 @@ const messages: Record<LanguageCode, Messages> = {
     "adoption.methodologyTitle": "这页该怎么读",
     "adoption.methodologyDescription":
       "这是一个 usage proxy dashboard，主要基于当前可见的 session 元数据构建。部分数字更适合看趋势，不适合当作精确用户分析或计费统计。",
+    "adoption.definitionsTitle": "这些指标是怎么算的",
+    "adoption.definitionsDescription":
+      "在把运营汇总当作业务事实之前，先快速看一下这些定义。它们与控制台当前使用的只读指标口径保持一致。",
+    "adoption.definition.formulaLabel": "计算方式",
+    "adoption.definition.readAsLabel": "解读方式",
+    "adoption.definition.activeUsersProxy.formula":
+      "统计最近 24 小时内活跃 session，按 workspaceId 去重；缺失时依次回退到 agentId、bindingId、channel。",
+    "adoption.definition.activeUsersProxy.readAs":
+      "它是可见使用广度的 proxy，不等同于真实人数。",
+    "adoption.definition.sessionsToday.formula":
+      "基于最新只读快照，统计当前自然日内有可见活动时间戳的 session 数。",
+    "adoption.definition.sessionsToday.readAs":
+      "它更适合做快照级会话趋势观察，不适合作为正式经营报表口径。",
+    "adoption.definition.turnsToday.formula":
+      "汇总当前自然日内活跃 session 的可见 messageCount。",
+    "adoption.definition.turnsToday.readAs":
+      "它是观察型交互量信号；当 transcript 或消息总数不完整时会偏低。",
+    "adoption.definition.avgDuration.formula":
+      "对可见 session 计算 startedAt 到 lastActivityAt 的平均时长；缺失或异常时间戳会保守处理。",
+    "adoption.definition.avgDuration.readAs":
+      "它更像会话深度的粗略指标，不应被当作 SLA 或工时事实。",
+    "adoption.definition.retention.formula":
+      "查看最近 7 天的可见活动，按 workspace、否则 agent、否则 channel 分组，衡量重复出现的分组和跨天活跃 proxy。",
+    "adoption.definition.retention.readAs":
+      "它是重复使用趋势信号，不是计费级留存指标。",
     "adoption.emptyTrendTitle": "当前还没形成稳定的使用趋势",
     "adoption.emptyTrendDescription": "这一时间窗里的可见 session 元数据还太稀疏，不足以支撑可靠的短期趋势判断。",
     "adoption.emptyHeatmapTitle": "当前还没形成稳定的时段热力分布",
@@ -1855,8 +1946,19 @@ const messages: Record<LanguageCode, Messages> = {
     "subjectType.collection": "采集项",
     "subjectType.topology-edge": "拓扑边",
     "metricConfidence.proxy": "Proxy",
+    "metricConfidence.observational": "观察型",
+    "metricConfidence.snapshot": "快照事实",
     "metricConfidence.limited": "样本有限",
     "metricConfidence.early": "早期信号",
+    "metricTrust.confidence": "可信度",
+    "metricTrust.coverage": "覆盖率",
+    "metricTrust.sampleWindow": "样本窗口",
+    "metricTrust.degradeReason": "降级原因：",
+    "metricTrust.openDefinition": "查看计算方式",
+    "metricTrust.sourceCoverage": "当前来源覆盖率为 {{value}}。",
+    "metricTrust.stale": "最新快照已处于陈旧状态。",
+    "metricTrust.warnings": "当前存在 {{count}} 条来源告警。",
+    "metricTrust.none": "当前快照没有激活中的来源降级信号。",
     "evidenceBridge.impact.high": "高影响",
     "evidenceBridge.impact.medium": "中影响",
     "evidenceBridge.impact.low": "低影响",

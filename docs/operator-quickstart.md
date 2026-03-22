@@ -1,6 +1,6 @@
 # Operator Quickstart
 
-This quickstart is for internal evaluators who want to run the current v0.2 alpha governance preview quickly and verify the read-only scope.
+This quickstart is for internal evaluators who want to run the current v0.3 alpha governance preview quickly and verify the read-only scope.
 
 ## What you are starting
 

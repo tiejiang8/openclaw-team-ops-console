@@ -1,6 +1,6 @@
 # Metric Definitions
 
-This document records the current v1 definitions for role-based dashboard metrics. These are intentionally pragmatic read-only roll-ups rather than canonical business reporting metrics.
+This document records the current `v0.3 alpha` definitions for role-based dashboard metrics. These are intentionally pragmatic read-only roll-ups rather than canonical business reporting metrics.
 
 ## Confidence levels
 
@@ -13,6 +13,26 @@ This document records the current v1 definitions for role-based dashboard metric
 - Observational metrics
   - Summaries such as average session duration, workspace heat, or early rollout signals may degrade to `0` or empty states when the supporting metadata is not visible enough.
   - The UI now explicitly labels these cases as `proxy`, `early signal`, or `limited sample`.
+
+## UI display conventions
+
+The current product surface should make trust posture visible at the point of use:
+
+- show `confidence`
+- show `coverage`
+- show `sample window`
+- show `degrade reason`
+- keep proxy metrics marked with `proxy` badges and `~` values where helpful
+
+## Core adoption metrics at a glance
+
+| Metric | Confidence | Sample window | Read as |
+|---|---|---|---|
+| `activeUsersProxy` | Proxy | last 24h | visible usage breadth, not real people count |
+| `sessionsToday` | Snapshot fact | current day | visible session count in the latest snapshot |
+| `turnsToday` | Observational | current day | observed interaction volume, can undercount |
+| `avgSessionDurationMinutes` | Observational | visible sessions in current snapshot | rough depth signal, not a utilization fact |
+| `repeatUsageRatio` | Proxy | last 7d | repeat-usage trend, not billing-grade retention |
 
 ## activeUsersProxy
 

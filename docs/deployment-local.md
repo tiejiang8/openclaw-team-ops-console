@@ -1,6 +1,6 @@
 # Local Deployment
 
-This document covers supported local startup paths for the current v0.2 alpha governance preview.
+This document covers supported local startup paths for the current v0.3 alpha governance preview.
 
 ## Supported modes
 

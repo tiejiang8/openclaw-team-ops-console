@@ -16,7 +16,7 @@ export async function connectOperatorRead(
       // recognized backend id and surface Team Ops identity via displayName.
       id: "gateway-client",
       displayName: "OpenClaw Team Ops Console",
-      version: "0.2.0-alpha.0",
+      version: "0.3.0-alpha.0",
       platform: process.platform,
       mode: "backend",
       instanceId: "openclaw-team-ops-console-sidecar",

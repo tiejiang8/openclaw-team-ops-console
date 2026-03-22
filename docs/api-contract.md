@@ -170,7 +170,7 @@ Recommendations do not execute anything.
 
 See:
 
-- [docs/v0.2-api-examples.md](v0.2-api-examples.md)
+- [docs/v0.3-api-examples.md](v0.3-api-examples.md)
 - [docs/examples/api/targets.json](examples/api/targets.json)
 - [docs/examples/api/findings.json](examples/api/findings.json)
 - [docs/examples/api/evidence.json](examples/api/evidence.json)

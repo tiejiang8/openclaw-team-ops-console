@@ -4,7 +4,7 @@
 
 - product: OpenClaw Team Ops Console
 - descriptor: Read-only governance and visibility for OpenClaw runtimes
-- phase: v0.2 alpha
+- phase: v0.3 alpha
 - status: governance preview for internal evaluation
 - mode: standalone, read-only, mock-first
 

@@ -1,4 +1,5 @@
 import { DataState } from "../components/data-state.js";
+import { AdoptionMetricDefinitions } from "../components/adoption/adoption-metric-definitions.js";
 import { SourceTracePanel } from "../components/evidence/source-trace-panel.js";
 import { EvidencePill } from "../components/evidence/evidence-pill.js";
 import { AdoptionKpiStrip } from "../components/adoption/adoption-kpi-strip.js";
@@ -38,12 +39,14 @@ export function AdoptionPage() {
       <DataState loading={loading} error={error} onRetry={retry}>
         {data ? (
           <>
-            <AdoptionKpiStrip dashboard={data.data} />
+            <AdoptionKpiStrip dashboard={data.data} meta={data.meta} />
 
             <div className="state-box state-box-warning panel-inline-note">
               <p className="state-title">{t("adoption.methodologyTitle")}</p>
               <p className="state-message">{t("adoption.methodologyDescription")}</p>
             </div>
+
+            <AdoptionMetricDefinitions />
 
             <div className="dashboard-grid dashboard-grid-2">
               <UsageTrendCard points={data.data.trendPoints} />
@@ -55,7 +58,7 @@ export function AdoptionPage() {
               <TopAgentsCard agents={data.data.topAgents} />
             </div>
 
-            <RetentionProxyCard retention={data.data.retention} />
+            <RetentionProxyCard retention={data.data.retention} meta={data.meta} />
 
             <article className="panel">
               <div className="panel-header">

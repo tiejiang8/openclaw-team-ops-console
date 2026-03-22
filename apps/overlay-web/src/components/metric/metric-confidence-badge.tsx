@@ -1,6 +1,6 @@
 import { useI18n } from "../../lib/i18n.js";
 
-type MetricConfidenceTone = "proxy" | "limited" | "early";
+export type MetricConfidenceTone = "proxy" | "observational" | "snapshot" | "limited" | "early";
 
 export function MetricConfidenceBadge({
   tone,

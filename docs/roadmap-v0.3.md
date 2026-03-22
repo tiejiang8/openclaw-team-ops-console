@@ -1,78 +1,86 @@
-# Roadmap v0.2
+# Roadmap v0.3 alpha
 
 ## Current status
 
-The repository now has the core v0.2 governance spine in place:
+The repository already has the core governance spine in place for `v0.3 alpha` review:
 
-- `Target Registry`
-- `Evidence`
-- `Findings`
-- `Risks Summary`
-- `Recommendations`
-- governance pages in `overlay-web`
+- role-based workbenches in `overlay-web`
+- read-only governance chain: `Evidence -> Finding -> Recommendation`
+- multi-target readiness via `SIDECAR_TARGETS_FILE`
+- explicit read-only runtime-plane integration via `operator.read`
+- mock-first plus filesystem-backed source collection
 
-## Delivered in the current implementation
+This means the current milestone is no longer about proving the console can exist. It is about making the existing scope easier to trust, easier to review, and easier to operate at larger scale.
 
-### 1) Governance model
+## Key risks and opportunities
 
-- `Target` domain model
-- target-scoped summary contract
-- explicit `Evidence`, `Finding`, `Recommendation`, and `RisksSummary` models
+### High-priority risks
 
-### 2) Governance API
+1. Version narrative can drift unless README, reviewer docs, and package metadata keep one `v0.3 alpha` story.
+2. Metric credibility is documented, but not every key KPI explains confidence, coverage, sample window, and degrade reason at the point of use.
+3. Multi-target scale still depends on polling plus a static local registry, which will raise latency and maintenance cost in broader team rollouts.
 
-- `GET /api/targets`
-- `GET /api/targets/:id`
-- `GET /api/targets/:id/summary`
-- `GET /api/evidence`
-- `GET /api/evidence/:id`
-- `GET /api/findings`
-- `GET /api/findings/:id`
-- `GET /api/recommendations`
-- `GET /api/recommendations/:id`
-- `GET /api/risks/summary`
+### High-value opportunities
 
-### 3) Governance UI
+1. The `Evidence / Finding / Recommendation` chain can grow naturally into a governance collaboration layer.
+2. The read-only boundary is already engineered into the product and can become a clearer trust label in external review.
+3. Role-based IA is already in place, which makes role-specific KPIs and action templates a practical next step.
 
-- `Targets`
-- `Target Detail`
-- `Risks`
-- `Findings`
-- `Finding Detail`
-- `Evidence`
-- `Evidence Detail`
+## Suggested delivery path
 
-### 4) Multi-target readiness
+### P0 (2 weeks): unify external narrative and review scope
 
-- `SIDECAR_TARGETS_FILE` support
-- mixed `mock` and `filesystem` targets in one console instance
-- target-level source metadata, coverage, warning count, and risk score
+- keep one release label everywhere: `v0.3 alpha`
+- keep one scope table in `README.md`
+- keep one canonical limitations list in `docs/v0.3-known-limitations.md`
+- keep one roadmap document that separates implemented, experimental, and explicitly out-of-scope items
 
-## Remaining work before a full v0.2 release recommendation
+Acceptance:
 
-### 1) Review artifacts
+- any new reviewer can explain what the product is, what it is not, and what stage it is in within 10 minutes
 
-- capture screenshots for governance pages
-- add test logs and reviewer evidence artifacts
-- finish acceptance checklist with final pass/fail counts
+### P1 (2 to 4 weeks): turn metric credibility into a product capability
 
-### 2) UX and traceability refinement
+- show `confidence`, `coverage`, `sample window`, and `degrade reason` on core adoption metrics
+- mark proxy metrics with clear UI signals such as `proxy` badges or `~` values
+- provide a fast in-product jump to "how this metric is calculated"
 
-- richer resource-to-evidence cross-links from inventory pages
-- tighter target-scoped resource drill-down flows
-- optional saved reviewer presets for common governance filters
+Acceptance:
 
-### 3) Test depth
+- reviewers do not mistake proxy or observational metrics for audit-grade business facts
 
-- expand browser-level E2E coverage beyond the current minimum governance drill-down flow
-- optional DTO snapshot tests for governance responses
+### P2 (4 to 8 weeks): add a governance collaboration loop without breaking read-only boundaries
 
-## Still deferred beyond v0.2
+- add local overlay state for recommendation handling such as `ack`, `snooze`, `owner`, and `dueDate`
+- add SLA, timeout, and recurrence markers for risk items
+- add review trail and export support for who reviewed what and when
 
-- write-back workflows
-- privileged control actions
-- chat UX
-- RBAC implementation
-- approval workflow engine
-- real-time event bus
-- remote execution
+Acceptance:
+
+- users can complete `finding -> ownership -> tracking -> review` inside the console without writing back to OpenClaw
+
+### P3 (parallel exploration): improve real-time posture and multi-target scale
+
+- move web refresh from polling toward SSE or push-driven updates
+- add optional discovery for targets while keeping it read-only and disableable
+- introduce cross-target baselines and percentiles for health and risk posture
+
+Acceptance:
+
+- multi-team review remains timely and low-maintenance as target count grows
+
+## North-star metrics
+
+Recommended governance-value metrics:
+
+- `MTTI-evidence`: median time from anomaly appearance to evidence identification
+- critical finding confirmation latency (`P50 / P90`)
+- configuration drift detection coverage
+- recovery time for `stale` or `unavailable` collections
+- weekly share of recommendations that are viewed and enter tracking
+
+Not recommended as the primary north-star:
+
+- raw chat/session growth alone
+
+For this product, the more important signal is conversion from governance visibility into governance action.
